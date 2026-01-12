@@ -68,7 +68,7 @@ In this repository, LumiBot + Alpaca are already wired up for you; you focus on 
 
 1. Go to the Alpaca website ([https://alpaca.markets](https://alpaca.markets)) and create an account (if you already have one, we recommend registering a new one to separate it from any personal account).
 2. In your account dashboard, enable a **paper trading** account.
-3. Generate an API key and secret for paper trading.
+3. Go to the Home page, scroll down to the API Keys section on the right, and click to generate your API Key and Secret.
 4. Note down:
    - `ALPACA_API_KEY`
    - `ALPACA_API_SECRET`
@@ -190,6 +190,7 @@ This will:
 - **Code**:
   - Your completed `strategies/strategy.py`.
   - Any additional helper modules (if allowed).
+  - `requirements.txt`: If your strategy uses any libraries not already listed in the default requirements.txt, you must manually add them to this file.
 - **Backtest results**:
   - The `logs` folder (or selected log files) from your best-performing backtest, clearly labeled.
 
