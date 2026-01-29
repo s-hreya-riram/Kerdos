@@ -1,0 +1,1 @@
+''' Placeholder to add configurations like name of assets, start/end dates for data fetching, etc. '''
