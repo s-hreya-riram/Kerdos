@@ -3,7 +3,7 @@ from lumibot.backtesting import YahooDataBacktesting
 from lumibot.brokers import Alpaca
 from config import ALPACA_CONFIG
 #from strategies.strategy import Strategy
-from strategies.example_strategy_5 import example_strategy_5
+from strategies.xgboost_strategy import MLPortfolioStrategy
 #from strategies.example_strategy_1 import example_strategy_1
 
 
@@ -17,11 +17,11 @@ def run_backtest():
     # You can find more information about the backtest environment here: https://lumibot.lumiwealth.com/backtesting.backtesting_function.html
     backtesting_start = datetime(2020, 1, 1)
     backtesting_end = datetime(2025, 12, 31)
-    budget = 100000
+    budget = 10000
 
     # Instantiate the strategy
     # strategy = Strategy(broker=broker)    
-    strategy = example_strategy_5(broker=broker)
+    strategy = MLPortfolioStrategy(broker=broker)
 
     strategy.run_backtest(
         YahooDataBacktesting,

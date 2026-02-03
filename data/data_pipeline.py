@@ -1,15 +1,14 @@
 import pandas as pd
 import numpy as np
-from utils import to_utc
+from .utils import to_utc
 from config import STOCK_CLIENT, CRYPTO_CLIENT
-from constants import CRYPTO_SYMBOLS
+from .constants import CRYPTO_SYMBOLS
 
 # Import Alpaca modules
 from alpaca.data.requests import StockBarsRequest, CryptoBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-# TODO extend to paper trading client for live data fetching
-def fetch_historical_data(stock_client, crypto_client, symbols, start_date, end_date=None, timeframe=TimeFrame.Day):
+def fetch_historical_data(symbols, start_date, end_date=None, timeframe=TimeFrame.Day, feed=None):
     print(f"Fetching historical data for: {symbols}")
 
     start_time = to_utc(start_date)
@@ -27,9 +26,10 @@ def fetch_historical_data(stock_client, crypto_client, symbols, start_date, end_
             symbol_or_symbols=stock_symbols,
             timeframe=timeframe,
             start=start_time,
-            end=end_time
+            end=end_time,
+            feed=feed
         )
-        bars = stock_client.get_stock_bars(request)
+        bars = STOCK_CLIENT.get_stock_bars(request)
 
         for symbol in stock_symbols:
             if symbol in bars.data and len(bars.data[symbol]) > 0:
@@ -55,7 +55,7 @@ def fetch_historical_data(stock_client, crypto_client, symbols, start_date, end_
             start=start_time,
             end=end_time
         )
-        bars = crypto_client.get_crypto_bars(request)
+        bars = CRYPTO_CLIENT.get_crypto_bars(request)
 
         for symbol in crypto_symbols:
             if symbol in bars.data and len(bars.data[symbol]) > 0:
@@ -229,7 +229,7 @@ def get_market_data_for_ml(symbols, start_date, end_date=None):
     print("Starting market data pipeline for ML...")
     
     # Fetch historical data
-    raw_data = fetch_historical_data(STOCK_CLIENT, CRYPTO_CLIENT, symbols, start_date, end_date)
+    raw_data = fetch_historical_data(symbols, start_date, end_date)
     
     if not raw_data:
         print("No data fetched!!!")
