@@ -25,11 +25,8 @@ class PortfolioRiskOptimizer:
         # for the model_params
         self.model_params = model_params or XGB_MODEL_PARAMS
 
-    # ---------------- Training / Fitting ----------------
+    
     def fit(self, X, y_ret, y_vol):
-        """
-        Fit models on full training data.
-        """
         Xs = self.scaler.fit_transform(X)
 
         self.vol_model = xgb.XGBRegressor(**self.model_params)
@@ -41,64 +38,28 @@ class PortfolioRiskOptimizer:
         self.is_trained = True
         return self
 
-    # ---------------- Time-series Splits ----------------
-    @staticmethod
-    def time_series_split(X, y_ret, y_vol, train_frac=0.7, val_frac=0.15):
-        """
-        Split data into train / validation / holdout while preserving time order.
-        """
-        n = len(X)
-        train_end = int(n * train_frac)
-        val_end = int(n * (train_frac + val_frac))
-
-        # Splitting data while preserving time order preventing future data from leaking into 
-        # validation and holdout sets
-        splits = {
-            "train": (X.iloc[:train_end], y_ret.iloc[:train_end], y_vol.iloc[:train_end]),
-            "val": (X.iloc[train_end:val_end], y_ret.iloc[train_end:val_end], y_vol.iloc[train_end:val_end]),
-            "holdout": (X.iloc[val_end:], y_ret.iloc[val_end:], y_vol.iloc[val_end:])
-        }
-
-        return splits
-
-    # ---------------- Cross-validation ----------------
-    @staticmethod
-    def time_series_cv(X, y, n_splits=5, model_params=None):
-        """
-        TimeSeriesSplit cross-validation for a single target (returns or volatility).
-        Returns R² scores for each fold.
-        """
-        tscv = TimeSeriesSplit(n_splits=n_splits)
-        scores = []
-
-        for fold, (train_idx, val_idx) in enumerate(tscv.split(X), 1):
-            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
-
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train)
-            X_val_scaled = scaler.transform(X_val)
-
-            model = xgb.XGBRegressor(**(model_params or XGB_MODEL_PARAMS))
-
-            model.fit(X_train_scaled, y_train)
-            y_pred = model.predict(X_val_scaled)
-            score = r2_score(y_val, y_pred)
-            scores.append(score)
-            print(f"[CV Fold {fold}] R²: {score:.4f}")
-
-        return scores
-
-    # ---------------- Prediction & Weights ----------------
     def predict(self, X):
         if not self.is_trained:
             raise RuntimeError("Model not trained")
 
         Xs = self.scaler.transform(X)
-        return {
-            "vol": self.vol_model.predict(Xs),
-            "ret": self.ret_model.predict(Xs)
-        }
+        vol = self.vol_model.predict(Xs)
+        ret = self.ret_model.predict(Xs)
+
+        vol = np.clip(vol, 1e-6, 2.0)
+        ret = np.clip(ret, -1.0, 1.0)
+
+        return {"vol": vol, "ret": ret}
+
+    def predict_latest(self, X, symbols):
+        """
+        Only predict for the most recent row per symbol.
+        Assumes X is time-ordered and contains multiple rows per symbol.
+        """
+        latest_rows = X.groupby(symbols).tail(1)
+        preds = self.predict(latest_rows)
+
+        return preds, latest_rows.index
 
     def optimal_weights(self, preds, assets, method="sharpe"):
         vol = preds["vol"]
@@ -106,21 +67,22 @@ class PortfolioRiskOptimizer:
 
         if method == "vol_parity":
             score = 1 / (vol + 1e-6)
-        else:  # sharpe-style
+        else:
             score = ret / (vol + 1e-6)
+
+        score = np.clip(score, -5, 5)
 
         w = np.maximum(score, 0)
         w = w / (w.sum() + 1e-9)
+
         return dict(zip(assets, w))
 
-    # ---------------- Evaluation ----------------
     @staticmethod
     def evaluate(y_true, y_pred):
         mse = mean_squared_error(y_true, y_pred)
         r2 = r2_score(y_true, y_pred)
         return {"r2": r2, "mse": mse}
 
-    # ---------------- Persistence ----------------
     def save(self, path="portfolio_optimizer.pkl"):
         joblib.dump(self, path)
 

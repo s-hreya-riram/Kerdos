@@ -25,12 +25,14 @@ class MLPortfolioStrategy(Strategy):
         self.lookback_days = 120
         self.last_train_date = None
 
+        self.market_proxy = "SPY"
+
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
     def _build_features_from_pipeline(self):
         """
-        Pull data from your pipeline and construct ML training matrices.
+        Pull data from the data pipeline and construct training matrices.
         """
 
         is_backtesting = self.is_backtesting
@@ -65,12 +67,21 @@ class MLPortfolioStrategy(Strategy):
 
         return X, y_ret, y_vol, ml_df["symbol"]
 
+    def _is_risk_on(self):
+        bars = self.get_historical_prices(self.market_proxy, 250, "day")
+        if bars is None or len(bars) < 200:
+            return True  # fail open
+
+        close = bars.df["close"]
+        ma200 = close.rolling(200).mean()
+        # We want to trade when we have a long-term uptrend
+        return close.iloc[-1] > ma200.iloc[-1]
+
     def on_trading_iteration(self):
         if self.optimizer is None:
             print("⚠️ No optimizer set. Skipping iteration.")
             return
 
-        # Avoid retraining every bar
         today = self.get_datetime().date()
         if self.last_train_date == today:
             return
@@ -87,47 +98,65 @@ class MLPortfolioStrategy(Strategy):
             print(f"⚠️ Not enough samples ({len(X)}).")
             return
 
-        # Train
-        # Clean labels to avoid XGBoost NaN/inf crash
-        mask = (
-            np.isfinite(y_ret.values) &
-            np.isfinite(y_vol.values)
-        )
-
+        mask = np.isfinite(y_ret.values) & np.isfinite(y_vol.values)
         X_clean = X.loc[mask]
         y_ret_clean = y_ret.loc[mask]
         y_vol_clean = y_vol.loc[mask]
+        symbols_clean = symbols.loc[mask]
 
-        if len(X_clean) < 50:
-            self.log(f"⚠️ Not enough clean samples ({len(X_clean)}). Skipping iteration.")
+        if len(X_clean) < self.min_samples:
+            print(f"⚠️ Not enough clean samples ({len(X_clean)}).")
             return
 
         self.optimizer.fit(X_clean, y_ret_clean, y_vol_clean)
 
-        # Predict
-        preds = self.optimizer.predict(X_clean)
+        # Predict only latest row per symbol
+        preds, latest_idx = self.optimizer.predict_latest(X_clean, symbols_clean)
+        latest_symbols = symbols_clean.loc[latest_idx].values
 
-        # Convert predictions to weights (IMPORTANT)
-        weights = self.optimizer.optimal_weights(preds, symbols)
+        weights = self.optimizer.optimal_weights(preds, latest_symbols)
 
-        budget = self.portfolio_value
+        # Optional regime filter
+        if not self._is_risk_on():
+            print("🧯 Risk-off regime detected — no trades placed.")
+            return
+
+        # Risk control
+        MAX_GROSS_EXPOSURE = 0.95   # never use more than 95% of portfolio
+        MAX_POSITION_PCT = 0.30    # never allocate more than 30% to one asset
+        MIN_TRADE_DOLLARS = 1000  # avoid dust trades
+
+        portfolio_value = self.portfolio_value
+        if portfolio_value <= 0:
+            print("🛑 Portfolio value <= 0, halting trading.")
+            return
+
         orders_placed = 0
 
         for sym, w in weights.items():
-            if abs(w) < 0.02:
-                continue
+            w = float(np.clip(w, -MAX_POSITION_PCT, MAX_POSITION_PCT))
+
+            target_dollars = w * portfolio_value * MAX_GROSS_EXPOSURE
 
             price = self.get_last_price(sym)
-            if price is None or price <= 0:
+            if not price or price <= 0:
                 continue
 
-            qty = int((w * budget) / price)
-            if qty == 0:
+            target_qty = int(target_dollars / price)
+            if target_qty == 0:
                 continue
 
-            side = "buy" if qty > 0 else "sell"
-            order = self.create_order(sym, abs(qty), side)
+            current_pos = self.get_position(sym)
+            current_qty = current_pos.quantity if current_pos else 0
+
+            delta_qty = target_qty - current_qty
+
+            if abs(delta_qty * price) < MIN_TRADE_DOLLARS:
+                continue
+
+            side = "buy" if delta_qty > 0 else "sell"
+            order = self.create_order(sym, abs(delta_qty), side)
             self.submit_order(order)
             orders_placed += 1
 
-        print(f"✅ ML placed {orders_placed} orders")
+        print(f"✅ XGB placed {orders_placed} rebalancing orders")
