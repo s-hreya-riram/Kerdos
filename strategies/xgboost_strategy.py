@@ -27,6 +27,15 @@ class MLPortfolioStrategy(Strategy):
 
         self.market_proxy = "SPY"
 
+        # TODO revisit these dates as more data becomes available
+        self.in_sample_end = pd.Timestamp('2024-12-31', tz='EST')
+        self.out_sample_start = pd.Timestamp('2025-01-01', tz='EST')
+        
+        # Track performance separately
+        self.in_sample_performance = []
+        self.out_sample_performance = []
+
+
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
@@ -36,8 +45,16 @@ class MLPortfolioStrategy(Strategy):
         """
 
         is_backtesting = self.is_backtesting
-        end_date = self.get_datetime()
+
+        # To prevent lookahead bias, we train on data up to yesterday
+        today = self.get_datetime()
+        end_date = today - pd.Timedelta(days=1)
         start_date = end_date - pd.Timedelta(days=self.lookback_days)
+        
+        # Log what period we're in
+        sample_type = "OUT-OF-SAMPLE" if self._is_out_of_sample() else "IN-SAMPLE"
+        print(f"  [{sample_type}] Training on: {start_date.date()} to {end_date.date()}")
+        print(f"  Predicting for: {today.date()}")
 
         symbol_mapping = ASSETS
 
@@ -60,6 +77,17 @@ class MLPortfolioStrategy(Strategy):
 
         if ml_df.empty:
             return None, None
+        
+        latest_data_date = ml_df.index.max()
+        # To ensure no data leakage occurs during backtesting
+        if is_backtesting:
+            days_gap = (today - latest_data_date).days
+            if days_gap < 1:
+                raise ValueError(
+                    f"⚠️ DATA LEAKAGE! Latest training data is {latest_data_date.date()} "
+                    f"but today is {today.date()}. Gap should be >= 1 day."
+                )
+            print(f"  ✅ No leakage: {days_gap} day gap between training data and prediction date")
 
         X = ml_df.drop(columns=["symbol", "target_return", "target_volatility"])
         y_ret = ml_df["target_return"]
@@ -160,3 +188,39 @@ class MLPortfolioStrategy(Strategy):
             orders_placed += 1
 
         print(f"✅ XGB placed {orders_placed} rebalancing orders")
+
+        if self._is_out_of_sample():
+            self.out_sample_performance.append({
+                'date': self.get_datetime(),
+                'value': portfolio_value
+            })
+        else:
+            self.in_sample_performance.append({
+                'date': self.get_datetime(),
+                'value': portfolio_value
+            })
+
+    # Summarize performance at the end of backtest
+    def on_abrupt_closing(self):
+        """Called when backtest ends - print performance summary"""
+        print("\n" + "="*60)
+        print("BACKTEST COMPLETE - PERFORMANCE SUMMARY")
+        print("="*60)
+        
+        if self.in_sample_performance:
+            in_sample_df = pd.DataFrame(self.in_sample_performance)
+            in_sample_return = (
+                (in_sample_df['value'].iloc[-1] / in_sample_df['value'].iloc[0] - 1) * 100
+            )
+            print(f"IN-SAMPLE (2020-2023):")
+            print(f"  Total Return: {in_sample_return:.2f}%")
+        
+        if self.out_sample_performance:
+            out_sample_df = pd.DataFrame(self.out_sample_performance)
+            out_sample_return = (
+                (out_sample_df['value'].iloc[-1] / out_sample_df['value'].iloc[0] - 1) * 100
+            )
+            print(f"\nOUT-OF-SAMPLE (2024):")
+            print(f"  Total Return: {out_sample_return:.2f}%")
+        
+        print("="*60 + "\n")
