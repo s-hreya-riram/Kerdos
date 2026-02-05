@@ -161,7 +161,7 @@ def create_cross_asset_features(data_dict, market_symbol="SPY"):
     return out
 
 
-def prepare_ml_features(data_dict, target_forward_days=1, mode = "curated"):
+def prepare_ml_features(data_dict, target_forward_days=1, mode = "curated", for_prediction=False):
     """
     Prepare features for ML model training
     
@@ -197,21 +197,30 @@ def prepare_ml_features(data_dict, target_forward_days=1, mode = "curated"):
         symbol_features = df[available_features].copy()
         symbol_features['symbol'] = symbol
         
-        # Create targets (forward-looking)
-        symbol_features['target_return'] = df['returns'].shift(-target_forward_days)
-        symbol_features['target_volatility'] = df['volatility_20d'].shift(-target_forward_days)
+        if not for_prediction:
+            # Only create targets during training
+            symbol_features['target_return'] = df['returns'].shift(-target_forward_days)
+            symbol_features['target_volatility'] = df['volatility_20d'].shift(-target_forward_days)
         
-        # Add to list
         feature_dfs.append(symbol_features)
     
-    # Combine all symbols
     combined_features = pd.concat(feature_dfs, ignore_index=False)
-    
-    # Remove rows with NaN values
+
+    if not for_prediction:
+            # Drop rows where we don't have future targets
+            pre_drop_count = len(combined_features)
+            combined_features = combined_features.dropna(subset=['target_return', 'target_volatility'])
+            post_drop_count = len(combined_features)
+            
+            rows_dropped = pre_drop_count - post_drop_count
+            if rows_dropped > 0:
+                print(f"  ⚠️  Dropped {rows_dropped} rows with unknown future targets")
+                print(f"  Latest training data: {combined_features.index.max().date()}")
+
+
+    # Drop NaN values in features as they could otherwise break model training
     combined_features = combined_features.dropna(subset=["returns", "volatility_20d", "momentum_20d", "rsi"])
-    
-    print(f"ML features prepared: {combined_features.shape[0]} samples, {combined_features.shape[1]} features")
-    
+   
     return combined_features
 
 def get_market_data_for_ml(symbols, start_date, end_date=None):
