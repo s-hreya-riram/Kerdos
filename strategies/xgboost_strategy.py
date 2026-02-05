@@ -107,6 +107,8 @@ class MLPortfolioStrategy(Strategy):
         if len(X_clean) < self.min_samples:
             print(f"⚠️ Not enough clean samples ({len(X_clean)}).")
             return
+        
+        print(f"ML data shapes: X={None if X_clean is None else X_clean.shape}")
 
         self.optimizer.fit(X_clean, y_ret_clean, y_vol_clean)
 
@@ -116,6 +118,9 @@ class MLPortfolioStrategy(Strategy):
 
         weights = self.optimizer.optimal_weights(preds, latest_symbols)
 
+        print(f"Raw weights: {weights}")
+
+        print(f"Risk on? {self._is_risk_on()} at {self.get_datetime()}")
         # Optional regime filter
         if not self._is_risk_on():
             print("🧯 Risk-off regime detected — no trades placed.")
@@ -156,6 +161,7 @@ class MLPortfolioStrategy(Strategy):
 
             side = "buy" if delta_qty > 0 else "sell"
             order = self.create_order(sym, abs(delta_qty), side)
+            print(f"Placing order {side} {sym} {abs(delta_qty)}")
             self.submit_order(order)
             orders_placed += 1
 

@@ -20,8 +20,8 @@ def run_backtest():
     budget = 10000
 
     # Instantiate the strategy
-    strategy = Strategy(broker=broker)    
-    # strategy = MLPortfolioStrategy(broker=broker)
+    #strategy = Strategy(broker=broker)    
+    strategy = MLPortfolioStrategy(broker=broker)
 
     strategy.run_backtest(
         YahooDataBacktesting,
