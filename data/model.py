@@ -74,6 +74,12 @@ class PortfolioRiskOptimizer:
         # Scale features
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_val_scaled = self.scaler.transform(X_val)
+
+        # Create a copy of params to avoid modifying the global constant
+        train_params = self.model_params.copy()
+        
+        # Move early_stopping_rounds to the constructor params
+        train_params['early_stopping_rounds'] = 50
         
         # Train return model with early stopping
         self.ret_model = xgb.XGBRegressor(**self.model_params)
@@ -81,7 +87,6 @@ class PortfolioRiskOptimizer:
             X_train_scaled, 
             y_ret_train,
             eval_set=[(X_val_scaled, y_ret_val)],
-            early_stopping_rounds=50,
             verbose=False
         )
         
@@ -91,7 +96,6 @@ class PortfolioRiskOptimizer:
             X_train_scaled, 
             y_vol_train,
             eval_set=[(X_val_scaled, y_vol_val)],
-            early_stopping_rounds=50,
             verbose=False
         )
         
