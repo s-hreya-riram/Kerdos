@@ -200,6 +200,33 @@ class MLPortfolioStrategy(Strategy):
                 'value': portfolio_value
             })
 
+    def calculate_sharpe(self, performance_list):
+        if len(performance_list) < 2:
+            return 0.0
+        
+        df = pd.DataFrame(performance_list)
+        df['return'] = df['value'].pct_change()
+
+        mean_return = df['return'].mean()
+        std_return = df['return'].std()
+
+        if std_return == 0 or np.isnan(std_return):
+            return 0.0
+        
+        sharpe_ratio = (mean_return / std_return) * np.sqrt(252)  # Annualized
+        return sharpe_ratio
+
+    def calculate_mdd(self, performance_list):
+        if len(performance_list) < 2:
+            return 0.0
+        
+        df = pd.DataFrame(performance_list)
+        df['cum_max'] = df['value'].cummax()
+        df['drawdown'] = (df['value'] - df['cum_max']) / df['cum_max']
+
+        max_drawdown = df['drawdown'].min()
+        return abs(max_drawdown)
+    
     # Summarize performance at the end of backtest
     def on_abrupt_closing(self):
         """Called when backtest ends - print performance summary"""
