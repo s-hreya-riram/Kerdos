@@ -75,7 +75,7 @@ class PortfolioRiskOptimizer:
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_val_scaled = self.scaler.transform(X_val)
         
-        # Train return model with early stopping
+        # Train return model
         self.ret_model = xgb.XGBRegressor(**self.model_params)
         self.ret_model.fit(
             X_train_scaled, 
@@ -84,7 +84,7 @@ class PortfolioRiskOptimizer:
             verbose=False
         )
         
-        # Train volatility model with early stopping
+        # Train volatility model
         self.vol_model = xgb.XGBRegressor(**self.model_params)
         self.vol_model.fit(
             X_train_scaled, 
@@ -145,7 +145,7 @@ class PortfolioRiskOptimizer:
 
         if method == "vol_parity":
             score = 1 / (vol + 1e-6)
-        else:
+        else: # default to sharpe ratio
             score = ret / (vol + 1e-6)
 
         score = np.clip(score, -5, 5)

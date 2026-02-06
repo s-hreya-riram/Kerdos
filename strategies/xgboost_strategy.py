@@ -29,7 +29,7 @@ class MLPortfolioStrategy(Strategy):
 
         # TODO revisit these dates as more data becomes available
         self.in_sample_end = pd.Timestamp('2024-12-31', tz='EST')
-        self.out_sample_start = pd.Timestamp('2026-02-01', tz='EST')
+        self.out_sample_start = pd.Timestamp('2025-01-01', tz='EST')
         
         # Track performance separately
         self.in_sample_performance = []
@@ -46,7 +46,7 @@ class MLPortfolioStrategy(Strategy):
 
         is_backtesting = self.is_backtesting
 
-        # To prevent lookahead bias, we train on data up to yesterday
+        # To prevent lookahead bias, we train on data up to the day before the current date
         today = self.get_datetime()
         end_date = today - pd.Timedelta(days=1)
         start_date = end_date - pd.Timedelta(days=self.lookback_days)
@@ -59,8 +59,8 @@ class MLPortfolioStrategy(Strategy):
         symbol_mapping = ASSETS
 
         raw_data = fetch_asset_data(
-            symbol_mapping=symbol_mapping,
-            is_backtesting=is_backtesting,
+            symbol_mapping=symbol_mapping, # since we're using Yahoo for backtesting, Alpaca for paper trading
+            is_backtesting=is_backtesting, # to identify the symbols to use
             start_date=start_date,
             end_date=end_date
         )
@@ -130,6 +130,7 @@ class MLPortfolioStrategy(Strategy):
             print(f"⚠️ Not enough samples ({len(X)}).")
             return
 
+        # narrowing to rows without NaNs
         mask = np.isfinite(y_ret.values) & np.isfinite(y_vol.values)
         X_clean = X.loc[mask]
         y_ret_clean = y_ret.loc[mask]
@@ -142,7 +143,7 @@ class MLPortfolioStrategy(Strategy):
 
         self.optimizer.fit(X_clean, y_ret_clean, y_vol_clean)
 
-        # Predict only latest row per symbol
+        # Predict the returns and volatility only for the latest row per symbol
         preds, latest_idx = self.optimizer.predict_latest(X_clean, symbols_clean)
         latest_symbols = symbols_clean.loc[latest_idx].values
 
