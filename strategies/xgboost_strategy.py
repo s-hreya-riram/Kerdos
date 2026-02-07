@@ -16,6 +16,7 @@ class MLPortfolioStrategy(Strategy):
     def __init__(self, broker, optimizer=None, min_samples=50, **kwargs):
         super().__init__(broker, **kwargs)
 
+        self.sleeptime = "1D"
         self.optimizer = optimizer or PortfolioRiskOptimizer(risk_target=0.15)
         self.min_samples = min_samples
 
@@ -23,13 +24,12 @@ class MLPortfolioStrategy(Strategy):
         self.targets = None
 
         self.lookback_days = 120
-        self.last_train_date = None
 
         self.market_proxy = "SPY"
 
         # TODO revisit these dates as more data becomes available
-        self.in_sample_end = pd.Timestamp('2024-12-31', tz='EST')
-        self.out_sample_start = pd.Timestamp('2025-01-01', tz='EST')
+        self.in_sample_end = pd.Timestamp('2025-06-30', tz='EST')
+        self.out_sample_start = pd.Timestamp('2025-07-01', tz='EST')
         
         # Track performance separately
         self.in_sample_performance = []
@@ -66,7 +66,7 @@ class MLPortfolioStrategy(Strategy):
         )
 
         if not raw_data:
-            return None, None
+            return None, None, None, None
 
         featured = {}
         for sym, df in raw_data.items():
@@ -76,7 +76,7 @@ class MLPortfolioStrategy(Strategy):
         ml_df = prepare_ml_features(enhanced)
 
         if ml_df.empty:
-            return None, None
+            return None, None, None, None
         
         latest_data_date = ml_df.index.max()
         # To ensure no data leakage occurs during backtesting
@@ -113,11 +113,6 @@ class MLPortfolioStrategy(Strategy):
         if self.optimizer is None:
             print("⚠️ No optimizer set. Skipping iteration.")
             return
-
-        today = self.get_datetime().date()
-        if self.last_train_date == today:
-            return
-        self.last_train_date = today
 
         data = self._build_features_from_pipeline()
         if data is None:
@@ -156,8 +151,8 @@ class MLPortfolioStrategy(Strategy):
 
         # Risk control
         MAX_GROSS_EXPOSURE = 0.95   # never use more than 95% of portfolio
-        MAX_POSITION_PCT = 0.30    # never allocate more than 30% to one asset
-        MIN_TRADE_DOLLARS = 1000  # avoid dust trades
+        MAX_POSITION_PCT = 0.33    # never allocate more than 33% to one asset
+        MIN_TRADE_DOLLARS = 100  # avoid dust trades
 
         portfolio_value = self.portfolio_value
         if portfolio_value <= 0:
@@ -217,7 +212,7 @@ class MLPortfolioStrategy(Strategy):
             in_sample_return = (
                 (in_sample_df['value'].iloc[-1] / in_sample_df['value'].iloc[0] - 1) * 100
             )
-            print(f"IN-SAMPLE (2020-2024):")
+            print(f"IN-SAMPLE:")
             print(f"  Total Return: {in_sample_return:.2f}%")
         
         if self.out_sample_performance:
@@ -225,7 +220,7 @@ class MLPortfolioStrategy(Strategy):
             out_sample_return = (
                 (out_sample_df['value'].iloc[-1] / out_sample_df['value'].iloc[0] - 1) * 100
             )
-            print(f"\nOUT-OF-SAMPLE (2025):")
+            print(f"\nOUT-OF-SAMPLE:")
             print(f"  Total Return: {out_sample_return:.2f}%")
         
         print("="*60 + "\n")

@@ -4,10 +4,14 @@ from zoneinfo import ZoneInfo
 # Alpaca is used for training/live trading and Yahoo Finance is used for backtesting
 ASSETS = [
     ("BTC/USD", "BTC-USD"),
-    ("ETH/USD", "ETH-USD"),
+    #("ETH/USD", "ETH-USD"),
     ("SPY", "SPY"),
     ("GLD", "GLD"),
-    ("VXX", "VXX")
+    ("SLV", "SLV"),
+    #("VXX", "VXX"),
+    #("VCMDX", "VCMDX"),
+    ("SMH", "SMH"),
+    ("ZAP", "ZAP")
 ]
 
 # Date ranges

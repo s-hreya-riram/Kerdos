@@ -2,6 +2,7 @@
 import yfinance as yf
 import pandas as pd
 import logging
+import time
 
 from .constants import CRYPTO_SYMBOLS
 from .data_pipeline import fetch_historical_data
@@ -21,10 +22,12 @@ def fetch_asset_data(symbol_mapping, is_backtesting, start_date=None, end_date=N
         if end_date is None:
             end_date = pd.Timestamp.utcnow()
 
-    for alpaca_symbol, yahoo_symbol in symbol_mapping:
+    for idx, (alpaca_symbol, yahoo_symbol) in enumerate(symbol_mapping):
         # Use Yahoo Finance for backtesting
         if is_backtesting:
             try:
+                if idx > 0:  # Don't wait before first request
+                    time.sleep(0.5)  # 500ms delay between each symbol
                 ticker = yf.Ticker(yahoo_symbol)
                 df = ticker.history(start=start_date, end=end_date)
 

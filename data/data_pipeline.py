@@ -265,7 +265,7 @@ def get_market_data_for_ml(symbols, start_date, end_date=None):
 # Only for test purposes - this will not be invoked in the overall flow!!!
 if __name__ == "__main__":
     # Test the data pipeline
-    test_symbols = ["SPY", "GLD", "VXX", "BTC/USD"]  # Subset for testing
+    test_symbols = ["SPY", "GLD", "VXX", "BTC/USD","SOXX"]  # Subset for testing
     start_date = '2025-01-01'
     end_date = '2026-01-01'
     
