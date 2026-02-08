@@ -37,3 +37,6 @@ XGB_MODEL_PARAMS = {
                         "n_jobs": -1,
                     }
 
+MAX_GROSS_EXPOSURE = 0.95
+MAX_POSITION_PCT = 0.33
+MIN_TRADE_DOLLARS = 100

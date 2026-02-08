@@ -19,3 +19,13 @@ seaborn>=0.12.0
 
 # Utilities
 tqdm>=4.65.0
+
+# Streamlit dashboard
+streamlit>=1.28.0
+plotly >=5.15.0
+
+# Image handling
+Pillow >=9.0.0
+
+# Database connectivity
+snowflake-connector-python>=3.0.0
