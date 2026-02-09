@@ -27,7 +27,7 @@ def fetch_asset_data(symbol_mapping, is_backtesting, start_date=None, end_date=N
         if is_backtesting:
             try:
                 if idx > 0:  # Don't wait before first request
-                    time.sleep(0.5)  # 500ms delay between each symbol
+                    time.sleep(0.01)  # 10ms delay between each symbol
                 ticker = yf.Ticker(yahoo_symbol)
                 df = ticker.history(start=start_date, end=end_date)
 

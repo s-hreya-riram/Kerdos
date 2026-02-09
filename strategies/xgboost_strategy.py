@@ -183,7 +183,7 @@ class MLPortfolioStrategy(Strategy):
             latest_symbols = symbols_clean.loc[latest_idx].values
 
             # Get raw weights (can be negative if model predicts)
-            raw_weights = self.optimizer.optimal_weights(preds, latest_symbols, method="sharpe")
+            raw_weights = self.optimizer.optimal_weights(preds, latest_symbols, method="vol_parity")
             
             # CONTROLLED SHORTING LOGIC
             if not self.allow_shorts:
