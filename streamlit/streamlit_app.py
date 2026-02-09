@@ -293,7 +293,7 @@ def render_fund_overview(perf_df):
             st.metric(
                 "Portfolio Value",
                 f"${latest_portfolio_value:,.2f}",
-                f"{(latest_portfolio_value/10000)*100:.1f}%",
+                f"{(latest_portfolio_value/10000 - 1)*100:.1f}%",
                 help="Total portfolio value including all positions and cash"
             )
             
