@@ -114,7 +114,7 @@ def get_snowflake_connection():
     )
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl="1d")
 def load_strategy_performance():
     """Load performance data for all strategies"""
     conn = get_snowflake_connection()
@@ -131,7 +131,7 @@ def load_strategy_performance():
     return df
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl="1d")
 def load_latest_positions(strategy_name):
     """Load latest positions for a strategy"""
     conn = get_snowflake_connection()
