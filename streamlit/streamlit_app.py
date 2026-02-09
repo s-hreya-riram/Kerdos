@@ -350,7 +350,7 @@ def render_fund_overview(perf_df):
         
         **February 28, 2026**
         
-        💰 Minimum Investment: $300
+        💰 Recommended Minimum Investment: $1000
         """)
     
     with col2:
@@ -359,7 +359,7 @@ def render_fund_overview(perf_df):
         
         **March 17, 2026**
         
-        💰 Minimum Investment: $300
+        💰 Recommended Minimum Investment: $1000
         """)
 
 
@@ -466,6 +466,7 @@ def render_performance_comparison(perf_df, risk_free_rate):
         font=dict(family="Inter, sans-serif"),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
+        title="Cumulative Portfolio Value Over Time",
         title_font_color=KERDOS_COLORS['primary'],
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
     )
