@@ -10,8 +10,7 @@ from data.constants import XGB_MODEL_PARAMS
 class PortfolioRiskOptimizer:
     """
     ML-based portfolio optimizer for time series.
-    Predicts future volatility and returns, converts predictions into portfolio weights.
-    Includes time-series-aware train/validation/holdout splits, CV, and evaluation.
+    FIXED: Proper time-series split with no overlap between train and validation
     """
 
     def __init__(self, risk_target=0.15, model_params=None):
@@ -21,10 +20,7 @@ class PortfolioRiskOptimizer:
         self.ret_model = None
         self.is_trained = False
 
-        # TODO perform hyperparameter tuning to identify the best inputs
-        # for the model_params
         self.model_params = model_params or XGB_MODEL_PARAMS
-
         self.last_val_metrics = None
 
     
@@ -32,11 +28,16 @@ class PortfolioRiskOptimizer:
         """
         Train with time-series validation split
         
+        CRITICAL FIX: The issue was that X might have multiple rows per timestamp
+        (one per symbol), so grouping by symbols was creating overlap.
+        
+        Solution: Split by TEMPORAL INDEX, not by row count
+        
         Args:
-            X: Features (DataFrame)
+            X: Features (DataFrame with DatetimeIndex)
             y_ret: Return targets (Series)
             y_vol: Volatility targets (Series)
-            validation_split: Fraction of most recent data for validation
+            validation_split: Fraction of most recent TIME PERIOD for validation
         """
         
         # If too little data, skip validation and train on all
@@ -53,23 +54,45 @@ class PortfolioRiskOptimizer:
             self.is_trained = True
             return self
         
-        # Splitting data w/o shuffling to retain time series order
-        # Last fraction of data (corresponding to validation_split) is for validation
-        split_idx = int(len(X) * (1 - validation_split))
+        # CRITICAL FIX: Split by TIME, not by row count
+        # Get unique timestamps
+        unique_dates = X.index.unique().sort_values()
         
-        X_train = X.iloc[:split_idx]
-        X_val = X.iloc[split_idx:]
+        # Split dates into train and validation periods
+        split_idx = int(len(unique_dates) * (1 - validation_split))
+        train_end_date = unique_dates[split_idx - 1]
+        val_start_date = unique_dates[split_idx]
         
-        y_ret_train = y_ret.iloc[:split_idx]
-        y_ret_val = y_ret.iloc[split_idx:]
+        print(f"    🕐 Total unique dates: {len(unique_dates)}")
+        print(f"    📅 Train cutoff: {train_end_date.date()}")
+        print(f"    📅 Val start: {val_start_date.date()}")
         
-        y_vol_train = y_vol.iloc[:split_idx]
-        y_vol_val = y_vol.iloc[split_idx:]
+        # Split data by date (NO OVERLAP!)
+        train_mask = X.index <= train_end_date
+        val_mask = X.index >= val_start_date
+        
+        X_train = X[train_mask]
+        X_val = X[val_mask]
+        
+        y_ret_train = y_ret[train_mask]
+        y_ret_val = y_ret[val_mask]
+        
+        y_vol_train = y_vol[train_mask]
+        y_vol_val = y_vol[val_mask]
         
         print(f"    Train samples: {len(X_train)}")
         print(f"    Val samples: {len(X_val)}")
         print(f"    Train period: {X_train.index.min().date()} to {X_train.index.max().date()}")
         print(f"    Val period: {X_val.index.min().date()} to {X_val.index.max().date()}")
+        
+        # Verify no overlap
+        if X_train.index.max() >= X_val.index.min():
+            raise ValueError(
+                f"❌ OVERLAP DETECTED! Train max ({X_train.index.max().date()}) >= "
+                f"Val min ({X_val.index.min().date()})"
+            )
+        
+        print(f"    ✅ No overlap: {(X_val.index.min() - X_train.index.max()).days} day gap")
         
         # Scale features
         X_train_scaled = self.scaler.fit_transform(X_train)
@@ -139,7 +162,7 @@ class PortfolioRiskOptimizer:
 
         return preds, latest_rows.index
 
-    def optimal_weights(self, preds, assets, method="sharpe"):
+    def optimal_weights(self, preds, assets, method="vol_parity"):
         vol = preds["vol"]
         ret = preds["ret"]
 
@@ -167,27 +190,3 @@ class PortfolioRiskOptimizer:
     @staticmethod
     def load(path="portfolio_optimizer.pkl"):
         return joblib.load(path)
-
-# Testing with simulated data to check functionality before wiring up in the strategy
-if __name__ == "__main__":
-    print("PortfolioRiskOptimizer Example")
-    # Example data
-    n_samples = 1000
-    n_features = 10
-    X = pd.DataFrame(np.random.randn(n_samples, n_features), columns=[f"feat_{i}" for i in range(n_features)])
-    y_ret = pd.Series(np.random.randn(n_samples) * 0.01)
-    y_vol = pd.Series(np.random.rand(n_samples) * 0.05)
-    assets = [f"asset_{i}" for i in range(n_samples)]
-    # Initialize and train model
-    optimizer = PortfolioRiskOptimizer()
-    optimizer.fit(X, y_ret, y_vol)
-    # Predict
-    preds = optimizer.predict(X)
-    # Get optimal weights
-    weights = optimizer.optimal_weights(preds, assets)
-    print("Optimal Weights:", weights)
-    # Evaluate
-    ret_eval = optimizer.evaluate(y_ret, preds["ret"])
-    vol_eval = optimizer.evaluate(y_vol, preds["vol"])
-    print("Return Evaluation:", ret_eval)
-    print("Volatility Evaluation:", vol_eval)

@@ -1,6 +1,9 @@
 """
-XGBoost Strategy - DEBUG VERSION with extensive logging
-This version has print statements everywhere to trace execution
+XGBoost Strategy - CONTROLLED SHORTING VERSION
+Allows shorts with proper risk management:
+- Maximum short exposure limits
+- Margin requirement tracking
+- Cash buffer maintenance
 """
 
 import numpy as np
@@ -14,19 +17,36 @@ from data.model import PortfolioRiskOptimizer
 
 class MLPortfolioStrategy(Strategy):
     """
-    ML-driven portfolio strategy - DEBUG VERSION
-    Prints extensive logs to trace callback execution
+    ML-driven portfolio strategy with controlled shorting
     """
 
-    def __init__(self, broker, performance_callback=None, optimizer=None, min_samples=50, **kwargs):
+    def __init__(self, 
+                 broker, 
+                 performance_callback=None, 
+                 optimizer=None, 
+                 min_samples=50,
+                 allow_shorts=True,          # NEW: Enable/disable shorting
+                 max_short_exposure=0.30,    # NEW: Max 30% of portfolio in shorts
+                 min_cash_buffer=0.05,       # NEW: Keep 5% cash minimum
+                 margin_requirement=1.5,     # NEW: Need 1.5x cash for shorts
+                 **kwargs):
         super().__init__(broker, **kwargs)
         
-        print("🔧 INIT: Creating MLPortfolioStrategy")
+        print("🔧 INIT: Creating MLPortfolioStrategy (Controlled Shorting)")
         print(f"   performance_callback provided: {performance_callback is not None}")
+        print(f"   allow_shorts: {allow_shorts}")
+        print(f"   max_short_exposure: {max_short_exposure*100:.1f}%")
+        print(f"   min_cash_buffer: {min_cash_buffer*100:.1f}%")
 
         self.sleeptime = "1D"
         self.optimizer = optimizer or PortfolioRiskOptimizer(risk_target=0.15)
         self.min_samples = min_samples
+
+        # Shorting controls
+        self.allow_shorts = allow_shorts
+        self.max_short_exposure = max_short_exposure
+        self.min_cash_buffer = min_cash_buffer
+        self.margin_requirement = margin_requirement
 
         if performance_callback is None:
             performance_callback = self.parameters.get("performance_callback")
@@ -39,7 +59,6 @@ class MLPortfolioStrategy(Strategy):
         self.targets = None
 
         self.lookback_days = 120
-
         self.market_proxy = "SPY"
 
         self.in_sample_end = pd.Timestamp('2025-06-30', tz='EST')
@@ -121,6 +140,7 @@ class MLPortfolioStrategy(Strategy):
     def on_trading_iteration(self):
         """
         CRITICAL: Callback is in finally block
+        NEW: Controlled shorting with margin management
         """
         print("\n" + "="*60)
         print(f"🔄 on_trading_iteration() CALLED at {self.get_datetime()}")
@@ -162,22 +182,59 @@ class MLPortfolioStrategy(Strategy):
             preds, latest_idx = self.optimizer.predict_latest(X_clean, symbols_clean)
             latest_symbols = symbols_clean.loc[latest_idx].values
 
-            weights = self.optimizer.optimal_weights(preds, latest_symbols)
-
-            # Clip individual position sizes
+            # Get raw weights (can be negative if model predicts)
+            raw_weights = self.optimizer.optimal_weights(preds, latest_symbols, method="sharpe")
+            
+            # CONTROLLED SHORTING LOGIC
+            if not self.allow_shorts:
+                # Long-only: clip to [0, MAX_POSITION_PCT]
+                print("   📊 Mode: LONG-ONLY")
+                weights = {sym: max(0, w) for sym, w in raw_weights.items()}
+            else:
+                # Allow shorts with limits
+                print("   📊 Mode: LONG/SHORT with limits")
+                weights = {}
+                
+                # Separate longs and shorts
+                long_weights = {sym: w for sym, w in raw_weights.items() if w > 0}
+                short_weights = {sym: w for sym, w in raw_weights.items() if w < 0}
+                
+                # Calculate total short exposure
+                total_short_exposure = abs(sum(short_weights.values()))
+                
+                # If shorts exceed limit, scale them down
+                if total_short_exposure > self.max_short_exposure:
+                    scale_factor = self.max_short_exposure / total_short_exposure
+                    short_weights = {sym: w * scale_factor for sym, w in short_weights.items()}
+                    print(f"   ⚠️  Scaled down shorts: {total_short_exposure:.1%} → {self.max_short_exposure:.1%}")
+                
+                # Combine longs and scaled shorts
+                weights = {**long_weights, **short_weights}
+            
+            # Clip individual positions
             clipped_weights = {
                 sym: float(np.clip(w, -MAX_POSITION_PCT, MAX_POSITION_PCT))
                 for sym, w in weights.items()
             }
-
-            # Renormalize gross exposure
-            gross_exposure = sum(abs(w) for w in clipped_weights.values())
-
-            if gross_exposure > MAX_GROSS_EXPOSURE and gross_exposure > 0:
+            
+            # Normalize weights
+            total_long = sum(w for w in clipped_weights.values() if w > 0)
+            total_short = abs(sum(w for w in clipped_weights.values() if w < 0))
+            
+            # Gross exposure = longs + abs(shorts)
+            gross_exposure = total_long + total_short
+            
+            if gross_exposure > MAX_GROSS_EXPOSURE:
                 scale = MAX_GROSS_EXPOSURE / gross_exposure
                 clipped_weights = {sym: w * scale for sym, w in clipped_weights.items()}
-
+                total_long *= scale
+                total_short *= scale
+            
             weights = clipped_weights
+            
+            print(f"   📈 Long exposure: {total_long:.1%}")
+            print(f"   📉 Short exposure: {total_short:.1%}")
+            print(f"   📊 Gross exposure: {total_long + total_short:.1%}")
             
             self.latest_predictions = {
                 'returns': preds['ret'].tolist(),
@@ -195,34 +252,83 @@ class MLPortfolioStrategy(Strategy):
                 print("   🛑 Portfolio value <= 0, halting trading.")
                 return
 
+            # Calculate required cash buffer
+            # For shorts: need margin_requirement * short_value in cash
+            required_short_margin = total_short * portfolio_value * self.margin_requirement
+            min_cash_required = max(
+                portfolio_value * self.min_cash_buffer,  # Minimum buffer
+                required_short_margin                     # Margin for shorts
+            )
+            
+            cash = self.get_cash()
+            available_for_longs = cash - min_cash_required
+            
+            print(f"   💰 Total cash: ${cash:,.2f}")
+            print(f"   🔒 Required for shorts margin: ${required_short_margin:,.2f}")
+            print(f"   🔒 Min cash buffer: ${portfolio_value * self.min_cash_buffer:,.2f}")
+            print(f"   ✅ Available for longs: ${available_for_longs:,.2f}")
+
             orders_placed = 0
 
+            # Execute trades
             for sym, w in weights.items():
-                w = float(np.clip(w, -MAX_POSITION_PCT, MAX_POSITION_PCT))
-                target_dollars = w * portfolio_value * MAX_GROSS_EXPOSURE
-
+                # Target dollar amount
+                target_dollars = w * portfolio_value
+                
                 price = self.get_last_price(sym)
                 if not price or price <= 0:
                     continue
 
-                target_qty = int(target_dollars / price)
-                if target_qty == 0:
+                # Target quantity (can be negative for shorts)
+                target_qty = target_dollars / price
+                target_qty = round(target_qty, 4)
+                
+                if abs(target_qty) < 0.0001:
                     continue
 
+                # Current position
                 current_pos = self.get_position(sym)
                 current_qty = current_pos.quantity if current_pos else 0
-
+                
+                # Delta needed
                 delta_qty = target_qty - current_qty
-
-                if abs(delta_qty * price) < MIN_TRADE_DOLLARS:
+                delta_dollars = delta_qty * price
+                
+                # CASH MANAGEMENT
+                if delta_qty > 0:  # Buying (going long or covering short)
+                    # Check if we have enough available cash
+                    if delta_dollars > available_for_longs:
+                        # Can't afford - reduce position
+                        affordable_qty = available_for_longs / price
+                        delta_qty = affordable_qty
+                        delta_dollars = delta_qty * price
+                        print(f"   ⚠️  {sym}: Reduced long from {target_qty:.4f} to {current_qty + delta_qty:.4f} (cash limit)")
+                        
+                        if delta_qty < 0.0001:
+                            continue
+                
+                # Check minimum trade size
+                if abs(delta_dollars) < MIN_TRADE_DOLLARS:
                     continue
-
+                
                 side = "buy" if delta_qty > 0 else "sell"
+                
                 order = self.create_order(sym, abs(delta_qty), side)
                 self.submit_order(order)
+                
+                # Update tracking
+                if side == "buy":
+                    available_for_longs -= delta_dollars
+                else:  # Selling (shorting or reducing long)
+                    available_for_longs += abs(delta_dollars)
+                
                 orders_placed += 1
+                
+                position_type = "LONG" if target_qty > 0 else "SHORT"
+                print(f"   📝 {side.upper()} {abs(delta_qty):.4f} {sym} @ ${price:.2f} ({position_type})")
 
-            print(f"   ✅ XGB placed {orders_placed} rebalancing orders")
+            print(f"   ✅ Placed {orders_placed} orders")
+            print(f"   💵 Estimated remaining cash: ${available_for_longs + min_cash_required:,.2f}")
 
             # Track performance
             if self._is_out_of_sample():
