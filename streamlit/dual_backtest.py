@@ -21,7 +21,7 @@ strategies_path = os.path.join(project_root, "strategies")
 sys.path.insert(0, strategies_path)
 from xgboost_strategy import MLPortfolioStrategy
 from spy_strategy import SPYBenchmarkStrategy
-sys.pop(0)
+sys.path.pop(0)
 data_path = os.path.join(project_root, "data")
 sys.path.insert(0, data_path)
 from utils import to_utc
