@@ -29,3 +29,6 @@ Pillow >=9.0.0
 
 # Database connectivity
 snowflake-connector-python>=3.0.0
+
+# Bayesion optimization
+optuna>=3.0.0

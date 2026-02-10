@@ -26,16 +26,8 @@ NY_TZ = ZoneInfo('America/New_York')
 
 CRYPTO_SYMBOLS = lambda s: "/" in s or s.endswith("USD")
 
-XGB_MODEL_PARAMS = {
-                        "n_estimators": 300,
-                        "max_depth": 4,
-                        "learning_rate": 0.05,
-                        "subsample": 0.8,
-                        "colsample_bytree": 0.8,
-                        "objective": "reg:squarederror",
-                        "random_state": 42,
-                        "n_jobs": -1,
-                    }
+# using the best hyperparameters found from hyperparameter_tuning.py using Bayesian Optimization
+XGB_MODEL_PARAMS = {'n_estimators': 496, 'max_depth': 6, 'learning_rate': 0.006804969902753306, 'subsample': 0.9209500039708808, 'colsample_bytree': 0.9546460881593619, 'min_child_weight': 6, 'gamma': 9.523455933694268e-05}
 
 MAX_GROSS_EXPOSURE = 0.95
 MAX_POSITION_PCT = 0.33
