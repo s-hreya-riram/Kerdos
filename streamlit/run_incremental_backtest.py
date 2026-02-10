@@ -1,9 +1,3 @@
-"""
-Incremental Backtest Runner
-Automatically runs backtests for dates missing from Snowflake
-Perfect for GitHub Actions daily updates
-"""
-
 import os
 import sys
 from datetime import datetime, timedelta
@@ -80,6 +74,21 @@ def get_next_trading_day(date):
         next_day += timedelta(days=1)
     
     return next_day
+
+
+def get_trading_days_between(start_date, end_date):
+    """
+    Count trading days between two dates (excluding weekends)
+    """
+    current = start_date
+    count = 0
+    
+    while current <= end_date:
+        if current.weekday() < 5:  # Monday=0, Friday=4
+            count += 1
+        current += timedelta(days=1)
+    
+    return count
 
 
 def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date, uploader):
@@ -168,16 +177,36 @@ def main():
             print(f"📊 Last data: {last_date.date()}")
             print(f"🔄 Will backtest from: {start_date.date()}")
         
-        # Check if we need to run backtest
+        # Check if we're already up-to-date or need to skip
         if start_date.date() > end_date.date():
             print(f"✅ {strategy_name} is already up-to-date!")
             print(f"   Latest data: {last_date.date() if last_date else 'N/A'}")
             print(f"   Target date: {end_date.date()}")
             continue
         
-        # Calculate number of days to backtest
-        days_to_backtest = (end_date - start_date).days
-        print(f"📈 Will backtest {days_to_backtest} days")
+        # Count trading days between start and end
+        trading_days = get_trading_days_between(start_date, end_date)
+        calendar_days = (end_date - start_date).days
+        
+        print(f"📈 Will backtest {trading_days} trading days ({calendar_days} calendar days)")
+        
+        # CRITICAL: Lumibot needs at least 2 days difference for backtesting
+        # If we only have same-day or next-day, we need to extend the range
+        if calendar_days < 2:
+            # Extend end_date by at least 2 days, skipping weekends
+            extended_end = end_date
+            days_added = 0
+            
+            while days_added < 2:
+                extended_end += timedelta(days=1)
+                if extended_end.weekday() < 5:  # Only count weekdays
+                    days_added += 1
+            
+            print(f"   ⚠️  Single day backtest detected")
+            print(f"   📅 Extending end date: {end_date.date()} → {extended_end.date()}")
+            print(f"   ℹ️  Note: Lumibot requires multi-day range, extra days won't affect results")
+            
+            end_date = extended_end
         
         # Run backtest
         success = run_incremental_backtest(
