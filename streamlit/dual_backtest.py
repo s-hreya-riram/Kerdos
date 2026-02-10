@@ -21,6 +21,10 @@ strategies_path = os.path.join(project_root, "strategies")
 sys.path.insert(0, strategies_path)
 from xgboost_strategy import MLPortfolioStrategy
 from spy_strategy import SPYBenchmarkStrategy
+sys.pop(0)
+data_path = os.path.join(project_root, "data")
+sys.path.insert(0, data_path)
+from utils import to_utc
 
 def is_valid_number(val):
     """Check if a value is a valid number (not NaN, not inf)"""
@@ -68,24 +72,25 @@ def create_callback_for_strategy(uploader, strategy_name, last_date_in_db=None):
             current_date = timestamp
         else:
             current_date = pd.to_datetime(timestamp)
-        
+        current_date_utc = to_utc(current_date)
         # ========== SMART DATE FILTERING ==========
         if last_date_in_db is not None:
             # Incremental mode: Skip dates we already have
-            if current_date <= last_date_in_db:
-                print(f"      ⏭️  Skip {current_date.date()} (already in DB)")
+            last_date_in_db_utc = to_utc(last_date_in_db)
+            if current_date_utc <= last_date_in_db_utc:
+                print(f"      ⏭️  Skip {current_date_utc.date()} (already in DB)")
                 return
             else:
-                print(f"      💾 Logging {current_date.date()} (NEW)")
+                print(f"      💾 Logging {current_date_utc.date()} (NEW)")
         else:
             # Full backtest mode: Log everything
-            print(f"      💾 Logging {current_date.date()}")
+            print(f"      💾 Logging {current_date_utc.date()}")
         # ========== END FILTERING ==========
         
         # Prepare performance data
         perf_data = {
             'STRATEGY_NAME': strategy_name,
-            'TIMESTAMP': current_date,
+            'TIMESTAMP': current_date_utc,
             'PORTFOLIO_VALUE': float(portfolio_value),
             'CASH': float(cash),
             'IS_OUT_OF_SAMPLE': bool(is_out_of_sample)
@@ -98,7 +103,7 @@ def create_callback_for_strategy(uploader, strategy_name, last_date_in_db=None):
         for symbol, pos_info in positions.items():
             pos_rows.append({
                 'STRATEGY_NAME': strategy_name,
-                'TIMESTAMP': current_date,
+                'TIMESTAMP': current_date_utc,
                 'SYMBOL': str(symbol),
                 'QUANTITY': float(pos_info['quantity']),
                 'MARKET_VALUE': float(pos_info['value']),
