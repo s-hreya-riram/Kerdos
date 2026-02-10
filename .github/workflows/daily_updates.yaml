@@ -34,6 +34,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
+      - name: Test Snowflake connection
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+        run: |
+          cd streamlit
+          python test_snowflake_connection.py
+      
       - name: Run incremental backtest
         env:
           # Snowflake credentials from GitHub Secrets
@@ -51,6 +63,7 @@ jobs:
         run: |
           cd streamlit
           python run_incremental_backtest.py
+        continue-on-error: false
       
       - name: Upload logs on failure
         if: failure()
@@ -73,3 +86,7 @@ jobs:
         run: |
           echo "❌ Incremental backtest failed"
           echo "Check the logs in artifacts for details"
+          echo "Common issues:"
+          echo "  1. Snowflake warehouse not activated"
+          echo "  2. Network timeout"
+          echo "  3. Missing market data for weekend/holiday"

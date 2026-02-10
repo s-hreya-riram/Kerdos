@@ -21,6 +21,12 @@ class SnowflakeUploader:
             database=os.getenv("SNOWFLAKE_DATABASE"),
             schema=os.getenv("SNOWFLAKE_SCHEMA", "PRODUCTION")
         )
+        
+        cursor = self.conn.cursor()
+        cursor.execute(f"USE WAREHOUSE {os.getenv('SNOWFLAKE_WAREHOUSE')}")
+        cursor.execute(f"USE DATABASE {os.getenv('SNOWFLAKE_DATABASE')}")
+        cursor.execute(f"USE SCHEMA {os.getenv('SNOWFLAKE_SCHEMA', 'PRODUCTION')}")
+        cursor.close()
 
         self._create_tables()
 
