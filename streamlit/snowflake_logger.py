@@ -93,19 +93,33 @@ class SnowflakeUploader:
 
         # STEP 2: Convert types to Python/string format
         def normalize_value(val):
-            # Handle None/NaN FIRST
-            if val is None or pd.isna(val):
+            # Handle None/NaN FIRST - be more aggressive
+            if val is None:
                 return None
             
+            # Check for pandas NaN
+            if pd.isna(val):
+                return None
+            
+            # Check for numpy NaN
+            if isinstance(val, (np.floating, np.integer)) and (np.isnan(val) if hasattr(np, 'isnan') and not isinstance(val, np.integer) else False):
+                return None
+                
             # Check for float NaN explicitly
             if isinstance(val, float):
                 if math.isnan(val) or math.isinf(val):
                     return None
             
-            # Check for numpy NaN
-            if isinstance(val, (np.floating,)):
-                if np.isnan(val) or np.isinf(val):
+            # Check for string representations of NaN
+            if isinstance(val, str) and val.upper() in ['NAN', 'NONE', 'NAT', '', 'NULL']:
+                return None
+            
+            # Convert the special case where Python shows 'nan' as a value
+            try:
+                if str(val).lower() in ['nan', 'none', 'nat']:
                     return None
+            except:
+                pass
 
             # Convert timestamps to STRING format
             if isinstance(val, pd.Timestamp):
@@ -125,11 +139,14 @@ class SnowflakeUploader:
                     val = val.replace(tzinfo=None)
                 return val.strftime('%Y-%m-%d %H:%M:%S')
 
-            # numpy numeric → python numeric
+            # numpy numeric → python numeric (with NaN check)
             if isinstance(val, (np.integer,)):
                 return int(val)
 
             if isinstance(val, (np.floating,)):
+                # Double-check for NaN in numpy floats
+                if np.isnan(val):
+                    return None
                 return float(val)
             
             # numpy bool → python bool
@@ -140,20 +157,34 @@ class SnowflakeUploader:
 
         df = df.map(normalize_value)
         
-        # STEP 3: Filter out rows with NaN in critical columns
-        # For predictions table, we need valid SYMBOL at minimum
+        # STEP 3: More aggressive NaN filtering
+        # Remove rows where critical columns have None/NaN
         if table_name == "STRATEGY_PREDICTIONS":
-            # Keep rows where SYMBOL is not None
+            # Keep rows where SYMBOL is not None AND at least one prediction is not None
             df = df[df['SYMBOL'].notna()]
-            # Convert NaN predictions to None is already done above
             
-        # STEP 4: Debug logging
+            # For predictions, if both PREDICTED_RETURN and PREDICTED_VOL are None, skip the row
+            df = df[~((df['PREDICTED_RETURN'].isna()) & (df['PREDICTED_VOL'].isna()))]
+            
+            # Replace remaining NaN with None explicitly
+            df['PREDICTED_RETURN'] = df['PREDICTED_RETURN'].where(pd.notna(df['PREDICTED_RETURN']), None)
+            df['PREDICTED_VOL'] = df['PREDICTED_VOL'].where(pd.notna(df['PREDICTED_VOL']), None)
+        
+        # STEP 4: Final cleanup - remove any rows that still contain string representations of NaN
         initial_rows = len(df)
         
-        # Remove any rows that still have string 'nan' or 'NaN'
+        # Remove any rows that still have string 'nan', 'NaN', etc.
         for col in df.columns:
             if df[col].dtype == 'object':
-                df = df[~df[col].astype(str).str.upper().isin(['NAN', 'NONE', 'NAT'])]
+                # Remove rows where string values are NaN representations
+                mask = ~df[col].astype(str).str.upper().isin(['NAN', 'NONE', 'NAT', 'NULL', ''])
+                df = df[mask]
+        
+        # Also check for actual NaN values that might have slipped through
+        # For predictions table, remove any rows with NaN in prediction columns
+        if table_name == "STRATEGY_PREDICTIONS":
+            nan_mask = df['PREDICTED_RETURN'].isna() & df['PREDICTED_VOL'].isna()
+            df = df[~nan_mask]
         
         final_rows = len(df)
         
@@ -175,8 +206,17 @@ class SnowflakeUploader:
         """
 
         try:
-            # Convert to list and insert
-            values_list = df.values.tolist()
+            # Convert to list and do final NaN check
+            values_list = []
+            for _, row in df.iterrows():
+                row_values = []
+                for val in row:
+                    # Final safety check before inserting
+                    if pd.isna(val) or (isinstance(val, str) and val.upper() in ['NAN', 'NONE', 'NAT']):
+                        row_values.append(None)
+                    else:
+                        row_values.append(val)
+                values_list.append(row_values)
             
             # Final sanity check - print first row for debugging
             if values_list:
@@ -195,6 +235,11 @@ class SnowflakeUploader:
             if len(df) > 1:
                 print(f"   Sample row (last):")
                 print(f"   {df.iloc[-1].to_dict()}")
+            
+            # Enhanced debugging - check the actual values going to Snowflake
+            print(f"   📋 First processed row for insertion: {values_list[0] if values_list else 'EMPTY'}")
+            if len(values_list) > 1:
+                print(f"   📋 Last processed row for insertion: {values_list[-1]}")
             
             # Check for any NaN in the actual values
             for idx, row in df.iterrows():
