@@ -77,7 +77,7 @@ def create_callback_for_strategy(uploader, strategy_name, last_date_in_db=None):
         if last_date_in_db is not None:
             # Incremental mode: Skip dates we already have
             last_date_in_db_utc = to_utc(last_date_in_db)
-            if current_date_utc <= last_date_in_db_utc:
+            if current_date_utc.date() <= last_date_in_db_utc.date():
                 print(f"      ⏭️  Skip {current_date_utc.date()} (already in DB)")
                 return
             else:
