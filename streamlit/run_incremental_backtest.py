@@ -67,73 +67,73 @@ def get_last_date_in_snowflake(strategy_name):
         print(f"❌ Error checking Snowflake: {e}")
         return None, None
 
-
-def get_next_trading_day(date):
+def run_incremental_backtest(strategy_name, strategy_class, uploader):
     """
-    Get the next trading day after the given date
-    Simple version: skip weekends
+    Run FULL backtest from beginning, but only log NEW dates
+    
+    Key insight:
+    - Always backtest from 2024-01-01 to today
+    - This ensures positions carry forward correctly
+    - But only log dates we don't already have
     """
-    next_day = date + timedelta(days=1)
+    
+    print(f"\n{'='*60}")
+    print(f"PROCESSING {strategy_name}")
+    print(f"{'='*60}")
+    
+    # Get last date in Snowflake
+    last_date, _ = get_last_date_in_snowflake(strategy_name)
+    
+    # Define backtest range
+    backtest_start = datetime(2024, 1, 1)
+    backtest_end = datetime.now() - timedelta(days=1)  # Yesterday
     
     # Skip weekends
-    while next_day.weekday() >= 5:  # 5=Saturday, 6=Sunday
-        next_day += timedelta(days=1)
+    while backtest_end.weekday() >= 5:
+        backtest_end -= timedelta(days=1)
     
-    return next_day
-
-
-def get_trading_days_between(start_date, end_date):
-    """
-    Count trading days between two dates (excluding weekends)
-    """
-    current = start_date
-    count = 0
+    if last_date:
+        print(f"📊 Last data in DB: {last_date.date()}")
+        print(f"📈 Will backtest: {backtest_start.date()} → {backtest_end.date()}")
+        print(f"💾 Will only LOG data after: {last_date.date()}")
+        
+        # Check if up-to-date
+        if last_date.date() >= backtest_end.date():
+            print(f"✅ {strategy_name} already up-to-date!")
+            return True
+    else:
+        print(f"⚠️  No existing data - running FULL backtest")
+        print(f"📈 Will backtest: {backtest_start.date()} → {backtest_end.date()}")
+        print(f"💾 Will log ALL data")
     
-    while current <= end_date:
-        if current.weekday() < 5:  # Monday=0, Friday=4
-            count += 1
-        current += timedelta(days=1)
-    
-    return count
-
-
-def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date, starting_capital, uploader):
-    """
-    Run backtest for a specific date range with proper starting capital
-    
-    Args:
-        strategy_name: Name of strategy (e.g., 'ML_XGBOOST')
-        strategy_class: Strategy class to run
-        start_date: Start date for backtest
-        end_date: End date for backtest
-        starting_capital: Portfolio value to start with (from last date or initial $10k)
-        uploader: SnowflakeUploader instance
-    """
-    print(f"\n{'='*60}")
-    print(f"RUNNING {strategy_name}")
-    print(f"{'='*60}")
-    print(f"Period: {start_date.date()} to {end_date.date()}")
-    print(f"Starting capital: ${starting_capital:,.2f}")
-    
-    callback = create_callback_for_strategy(uploader, strategy_name)
+    # Create callback with date filter
+    callback = create_callback_for_strategy(
+        uploader, 
+        strategy_name, 
+        last_date  # ← Pass last date to filter
+    )
     
     try:
+        # ========== RUN FULL BACKTEST ==========
+        # This ensures positions carry forward correctly
         result = strategy_class.run_backtest(
             YahooDataBacktesting,
-            start_date,
-            end_date,
-            budget=starting_capital,  # ✅ FIXED: Use actual portfolio value from last date
+            backtest_start,  # Always from beginning
+            backtest_end,
+            budget=10000,  # Always start with $10k (positions will build up)
             show_plot=False,
             save_tearsheet=False,
             parameters={
                 "performance_callback": callback
             }
         )
+        # ========== END BACKTEST ==========
+        
         print(f"✅ {strategy_name} backtest complete")
         return True
         
     except Exception as e:
-        print(f"❌ {strategy_name} backtest failed: {e}")
+        print(f"❌ {strategy_name} failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -141,13 +141,14 @@ def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date
 
 def main():
     """
-    Main incremental backtest runner
+    Incremental backtest runner
     
-    Key improvements:
-    1. Fetches last portfolio value from Snowflake
-    2. Uses that as starting capital for incremental backtest
-    3. Ensures continuity in portfolio value tracking
+    Strategy:
+    1. Always run FULL backtest from 2024-01-01
+    2. But only LOG new dates to Snowflake
+    3. This ensures positions carry forward correctly
     """
+    
     print("="*60)
     print("INCREMENTAL BACKTEST RUNNER")
     print("="*60)
@@ -159,17 +160,6 @@ def main():
         ("SPY_BENCHMARK", SPYBenchmarkStrategy)
     ]
     
-    # Get current date (yesterday, since today's data isn't complete yet)
-    today = datetime.now().date()
-    yesterday = today - timedelta(days=1)
-    end_date = datetime.combine(yesterday, datetime.min.time())
-    
-    # Skip weekends for end_date
-    while end_date.weekday() >= 5:
-        end_date -= timedelta(days=1)
-    
-    print(f"\n📅 Target end date: {end_date.date()}")
-    
     # Connect to Snowflake
     print("\n🔗 Connecting to Snowflake...")
     uploader = SnowflakeUploader()
@@ -177,68 +167,7 @@ def main():
     
     # Process each strategy
     for strategy_name, strategy_class in strategies:
-        print(f"\n{'='*60}")
-        print(f"PROCESSING {strategy_name}")
-        print(f"{'='*60}")
-        
-        # Get last date AND portfolio value in Snowflake
-        last_date, last_portfolio_value = get_last_date_in_snowflake(strategy_name)
-        
-        if last_date is None:
-            # No data exists - run full backtest from beginning
-            print(f"⚠️  No existing data for {strategy_name}")
-            print(f"   Running FULL backtest from 2024-01-01")
-            start_date = datetime(2024, 1, 1)
-            starting_capital = 10000  # ✅ Initial capital for first-ever run
-        else:
-            # Data exists - run incremental backtest
-            # Start from next trading day after last date
-            start_date = get_next_trading_day(last_date)
-            starting_capital = last_portfolio_value
-            
-            print(f"📊 Last data: {last_date.date()}")
-            print(f"🔄 Will backtest from: {start_date.date()}")
-        
-        # Check if we're already up-to-date or need to skip
-        if start_date.date() > end_date.date():
-            print(f"✅ {strategy_name} is already up-to-date!")
-            print(f"   Latest data: {last_date.date() if last_date else 'N/A'}")
-            print(f"   Target date: {end_date.date()}")
-            continue
-        
-        # Count trading days between start and end
-        trading_days = get_trading_days_between(start_date, end_date)
-        calendar_days = (end_date - start_date).days
-        
-        print(f"📈 Will backtest {trading_days} trading days ({calendar_days} calendar days)")
-        
-        # CRITICAL: Lumibot needs at least 2 days difference for backtesting
-        # If we only have same-day or next-day, we need to extend the range
-        if calendar_days < 2:
-            # Extend end_date by at least 2 days, skipping weekends
-            extended_end = end_date
-            days_added = 0
-            
-            while days_added < 2:
-                extended_end += timedelta(days=1)
-                if extended_end.weekday() < 5:  # Only count weekdays
-                    days_added += 1
-            
-            print(f"   ⚠️  Single day backtest detected")
-            print(f"   📅 Extending end date: {end_date.date()} → {extended_end.date()}")
-            print(f"   ℹ️  Note: Lumibot requires multi-day range, extra days won't affect results")
-            
-            end_date = extended_end
-        
-        # Run backtest with correct starting capital
-        success = run_incremental_backtest(
-            strategy_name,
-            strategy_class,
-            start_date,
-            end_date,
-            starting_capital,
-            uploader
-        )
+        success = run_incremental_backtest(strategy_name, strategy_class, uploader)
         
         if success:
             print(f"✅ {strategy_name} updated successfully")
@@ -250,10 +179,8 @@ def main():
     uploader.close()
     
     print("\n" + "="*60)
-    print("✅ INCREMENTAL BACKTEST COMPLETE")
+    print("✅ INCREMENTAL UPDATE COMPLETE")
     print("="*60)
-    print(f"End time: {datetime.now()}")
-    print("\nData has been updated in Snowflake!")
 
 
 if __name__ == "__main__":

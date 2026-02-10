@@ -36,98 +36,106 @@ def is_valid_number(val):
             return False
     return True
 
-
-def create_callback_for_strategy(uploader: SnowflakeUploader, strategy_name: str):
+def create_callback_for_strategy(uploader, strategy_name, last_date_in_db=None):
     """
-    Creates a callback function that logs to Snowflake with the given strategy name
-    ROBUST version with complete NaN filtering
+    Create a callback for logging strategy performance to Snowflake
+    
+    Args:
+        uploader: SnowflakeUploader instance
+        strategy_name: Strategy identifier (e.g., 'ML_XGBOOST', 'SPY_BENCHMARK')
+        last_date_in_db: Optional - Last date already in Snowflake
+                        If None: Logs ALL data (full backtest)
+                        If set: Only logs data AFTER this date (incremental)
+    
+    Usage:
+        # Full backtest (log everything):
+        callback = create_callback_for_strategy(uploader, "ML_XGBOOST")
+        
+        # Incremental backtest (only log new dates):
+        callback = create_callback_for_strategy(uploader, "ML_XGBOOST", last_date)
     """
+    
     def callback(data):
-        try:
-            # Build performance record
-            perf_data = {
+        timestamp = data['timestamp']
+        portfolio_value = data['portfolio_value']
+        cash = data['cash']
+        positions = data['positions']
+        is_out_of_sample = data['is_out_of_sample']
+        predictions = data.get('predictions', {})
+        
+        # Convert timestamp to datetime
+        if hasattr(timestamp, 'date'):
+            current_date = timestamp
+        else:
+            current_date = pd.to_datetime(timestamp)
+        
+        # ========== SMART DATE FILTERING ==========
+        if last_date_in_db is not None:
+            # Incremental mode: Skip dates we already have
+            if current_date <= last_date_in_db:
+                print(f"      ⏭️  Skip {current_date.date()} (already in DB)")
+                return
+            else:
+                print(f"      💾 Logging {current_date.date()} (NEW)")
+        else:
+            # Full backtest mode: Log everything
+            print(f"      💾 Logging {current_date.date()}")
+        # ========== END FILTERING ==========
+        
+        # Prepare performance data
+        perf_data = {
+            'STRATEGY_NAME': strategy_name,
+            'TIMESTAMP': current_date,
+            'PORTFOLIO_VALUE': float(portfolio_value),
+            'CASH': float(cash),
+            'IS_OUT_OF_SAMPLE': bool(is_out_of_sample)
+        }
+        
+        perf_df = pd.DataFrame([perf_data])
+        
+        # Prepare positions data
+        pos_rows = []
+        for symbol, pos_info in positions.items():
+            pos_rows.append({
                 'STRATEGY_NAME': strategy_name,
-                'TIMESTAMP': data['timestamp'],
-                'PORTFOLIO_VALUE': data['portfolio_value'],
-                'CASH': data['cash'],
-                'IS_OUT_OF_SAMPLE': data['is_out_of_sample']
-            }
+                'TIMESTAMP': current_date,
+                'SYMBOL': str(symbol),
+                'QUANTITY': float(pos_info['quantity']),
+                'MARKET_VALUE': float(pos_info['value']),
+                'AVG_PRICE': float(pos_info.get('avg_price', 0))
+            })
+        
+        pos_df = pd.DataFrame(pos_rows) if pos_rows else pd.DataFrame()
+        
+        # Prepare predictions data (ML strategies only)
+        pred_df = pd.DataFrame()
+        if predictions and predictions.get('symbols'):
+            pred_rows = []
+            for i, symbol in enumerate(predictions['symbols']):
+                pred_rows.append({
+                    'STRATEGY_NAME': strategy_name,
+                    'TIMESTAMP': current_date,
+                    'SYMBOL': str(symbol),
+                    'PREDICTED_RETURN': float(predictions['returns'][i]) if i < len(predictions['returns']) else None,
+                    'PREDICTED_VOL': float(predictions['volatility'][i]) if i < len(predictions['volatility']) else None
+                })
+            pred_df = pd.DataFrame(pred_rows)
+        
+        # Upload to Snowflake
+        try:
+            uploader.upload_performance(perf_df)
+            if not pos_df.empty:
+                uploader.upload_positions(pos_df)
+            if not pred_df.empty:
+                uploader.upload_predictions(pred_df)
             
-            # Upload performance
-            uploader.upload_performance(pd.DataFrame([perf_data]))
-            
-            # Upload positions
-            positions = data.get('positions', {})
-            if positions:
-                pos_records = []
-                for symbol, pos_info in positions.items():
-                    # Skip if any critical value is NaN
-                    quantity = pos_info.get('quantity', 0)
-                    market_value = pos_info.get('value', 0)
-                    avg_price = pos_info.get('avg_price', 0)
-                    
-                    if not is_valid_number(quantity) or not is_valid_number(market_value) or not is_valid_number(avg_price):
-                        print(f"   ⚠️  Skipping position {symbol} due to NaN values")
-                        continue
-                    
-                    pos_records.append({
-                        'STRATEGY_NAME': strategy_name,
-                        'TIMESTAMP': data['timestamp'],
-                        'SYMBOL': symbol,
-                        'QUANTITY': quantity,
-                        'MARKET_VALUE': market_value,
-                        'AVG_PRICE': avg_price
-                    })
-                
-                if pos_records:
-                    uploader.upload_positions(pd.DataFrame(pos_records))
-            
-            # Upload predictions (ML strategy only)
-            predictions = data.get('predictions', {})
-            if predictions and predictions.get('symbols'):
-                pred_records = []
-                symbols_list = predictions.get('symbols', [])
-                returns_list = predictions.get('returns', [])
-                vol_list = predictions.get('volatility', [])
-                
-                for i, symbol in enumerate(symbols_list):
-                    # Skip if symbol is invalid
-                    if not symbol or pd.isna(symbol):
-                        continue
-                    
-                    # Get prediction values
-                    pred_return = returns_list[i] if i < len(returns_list) else None
-                    pred_vol = vol_list[i] if i < len(vol_list) else None
-                    
-                    # CRITICAL: Skip this prediction if ANY value is NaN
-                    # We only include predictions with BOTH valid return AND volatility
-                    if not is_valid_number(pred_return) or not is_valid_number(pred_vol):
-                        print(f"   ⚠️  Skipping prediction for {symbol} due to NaN (return={pred_return}, vol={pred_vol})")
-                        continue
-                    
-                    pred_records.append({
-                        'STRATEGY_NAME': strategy_name,
-                        'TIMESTAMP': data['timestamp'],
-                        'SYMBOL': symbol,
-                        'PREDICTED_RETURN': float(pred_return),
-                        'PREDICTED_VOL': float(pred_vol)
-                    })
-                
-                if pred_records:
-                    print(f"   📊 Uploading {len(pred_records)} valid predictions (skipped {len(symbols_list) - len(pred_records)} NaN predictions)")
-                    uploader.upload_predictions(pd.DataFrame(pred_records))
-                else:
-                    print(f"   ⚠️  No valid predictions to upload (all {len(symbols_list)} had NaN values)")
-            
-            print(f"✅ Logged {strategy_name} data for {data['timestamp']}")
-            
+            print(f"         ✅ Uploaded to Snowflake")
         except Exception as e:
-            print(f"❌ Error logging {strategy_name}: {e}")
+            print(f"         ❌ Upload error: {e}")
             import traceback
             traceback.print_exc()
     
     return callback
-
 
 def run_dual_backtest():
     """
