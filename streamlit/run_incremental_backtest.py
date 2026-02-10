@@ -22,8 +22,8 @@ load_dotenv()
 
 def get_last_date_in_snowflake(strategy_name):
     """
-    Get the last date we have data for in Snowflake
-    Returns None if no data exists
+    Get the last date and portfolio value we have data for in Snowflake
+    Returns (last_date, portfolio_value) or (None, None) if no data exists
     """
     try:
         conn = snowflake.connector.connect(
@@ -35,12 +35,16 @@ def get_last_date_in_snowflake(strategy_name):
             schema=os.getenv("SNOWFLAKE_SCHEMA", "PRODUCTION")
         )
         
+        # CRITICAL: Explicitly activate warehouse
         cursor = conn.cursor()
+        cursor.execute(f"USE WAREHOUSE {os.getenv('SNOWFLAKE_WAREHOUSE')}")
         
         query = f"""
-        SELECT MAX(TIMESTAMP) as last_date
+        SELECT TIMESTAMP, PORTFOLIO_VALUE
         FROM STRATEGY_PERFORMANCE
         WHERE STRATEGY_NAME = '{strategy_name}'
+        ORDER BY TIMESTAMP DESC
+        LIMIT 1
         """
         
         cursor.execute(query)
@@ -51,15 +55,17 @@ def get_last_date_in_snowflake(strategy_name):
         
         if result and result[0]:
             last_date = pd.to_datetime(result[0])
+            portfolio_value = float(result[1])
             print(f"✅ Last {strategy_name} date in Snowflake: {last_date.date()}")
-            return last_date
+            print(f"   Portfolio value: ${portfolio_value:,.2f}")
+            return last_date, portfolio_value
         else:
             print(f"⚠️  No {strategy_name} data found in Snowflake")
-            return None
+            return None, None
             
     except Exception as e:
         print(f"❌ Error checking Snowflake: {e}")
-        return None
+        return None, None
 
 
 def get_next_trading_day(date):
@@ -91,14 +97,23 @@ def get_trading_days_between(start_date, end_date):
     return count
 
 
-def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date, uploader):
+def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date, starting_capital, uploader):
     """
-    Run backtest for a specific date range
+    Run backtest for a specific date range with proper starting capital
+    
+    Args:
+        strategy_name: Name of strategy (e.g., 'ML_XGBOOST')
+        strategy_class: Strategy class to run
+        start_date: Start date for backtest
+        end_date: End date for backtest
+        starting_capital: Portfolio value to start with (from last date or initial $10k)
+        uploader: SnowflakeUploader instance
     """
     print(f"\n{'='*60}")
     print(f"RUNNING {strategy_name}")
     print(f"{'='*60}")
     print(f"Period: {start_date.date()} to {end_date.date()}")
+    print(f"Starting capital: ${starting_capital:,.2f}")
     
     callback = create_callback_for_strategy(uploader, strategy_name)
     
@@ -107,7 +122,7 @@ def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date
             YahooDataBacktesting,
             start_date,
             end_date,
-            budget=10000,  # This should match your initial capital
+            budget=starting_capital,  # ✅ FIXED: Use actual portfolio value from last date
             show_plot=False,
             save_tearsheet=False,
             parameters={
@@ -127,6 +142,11 @@ def run_incremental_backtest(strategy_name, strategy_class, start_date, end_date
 def main():
     """
     Main incremental backtest runner
+    
+    Key improvements:
+    1. Fetches last portfolio value from Snowflake
+    2. Uses that as starting capital for incremental backtest
+    3. Ensures continuity in portfolio value tracking
     """
     print("="*60)
     print("INCREMENTAL BACKTEST RUNNER")
@@ -161,18 +181,20 @@ def main():
         print(f"PROCESSING {strategy_name}")
         print(f"{'='*60}")
         
-        # Get last date in Snowflake
-        last_date = get_last_date_in_snowflake(strategy_name)
+        # Get last date AND portfolio value in Snowflake
+        last_date, last_portfolio_value = get_last_date_in_snowflake(strategy_name)
         
         if last_date is None:
             # No data exists - run full backtest from beginning
             print(f"⚠️  No existing data for {strategy_name}")
             print(f"   Running FULL backtest from 2024-01-01")
             start_date = datetime(2024, 1, 1)
+            starting_capital = 10000  # ✅ Initial capital for first-ever run
         else:
             # Data exists - run incremental backtest
             # Start from next trading day after last date
             start_date = get_next_trading_day(last_date)
+            starting_capital = last_portfolio_value
             
             print(f"📊 Last data: {last_date.date()}")
             print(f"🔄 Will backtest from: {start_date.date()}")
@@ -208,12 +230,13 @@ def main():
             
             end_date = extended_end
         
-        # Run backtest
+        # Run backtest with correct starting capital
         success = run_incremental_backtest(
             strategy_name,
             strategy_class,
             start_date,
             end_date,
+            starting_capital,
             uploader
         )
         
