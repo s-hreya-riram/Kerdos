@@ -110,11 +110,12 @@ def get_snowflake_connection():
 
     return snowflake.connector.connect(
         user=user, password=password, account=account,
-        warehouse=warehouse, database=database, schema=schema, role=role
+        warehouse=warehouse, database=database, schema=schema, role=role,
+        client_session_keep_alive=True
     )
 
 
-@st.cache_data(ttl="1d")
+@st.cache_data(ttl="14400")
 def load_strategy_performance():
     """Load performance data for all strategies"""
     conn = get_snowflake_connection()
@@ -131,7 +132,7 @@ def load_strategy_performance():
     return df
 
 
-@st.cache_data(ttl="1d")
+@st.cache_data(ttl="14400")
 def load_latest_positions(strategy_name):
     """Load latest positions for a strategy"""
     conn = get_snowflake_connection()
