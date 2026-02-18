@@ -72,6 +72,28 @@ class SnowflakeUploader:
         )
         """)
 
+        # ---- Competition Performance Table ----
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS COMPETITION_PERFORMANCE (
+            STRATEGY_NAME STRING,
+            TIMESTAMP TIMESTAMP_NTZ,
+            PORTFOLIO_VALUE FLOAT,
+            CASH FLOAT
+        )
+        """)
+
+        # ---- Competition Positions Table ----
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS COMPETITION_POSITIONS (
+            STRATEGY_NAME STRING,
+            TIMESTAMP TIMESTAMP_NTZ,
+            SYMBOL STRING,
+            QUANTITY FLOAT,
+            MARKET_VALUE FLOAT,
+            AVG_PRICE FLOAT
+        )
+        """)
+
         cursor.close()
 
     # ---------------------------------------------------
@@ -255,7 +277,7 @@ class SnowflakeUploader:
 
 
     # ---------------------------------------------------
-    # Convenience Upload Helpers
+    # Convenience Upload Helpers - Historical Tables
     # ---------------------------------------------------
 
     def upload_performance(self, df: pd.DataFrame):
@@ -266,6 +288,25 @@ class SnowflakeUploader:
 
     def upload_predictions(self, df: pd.DataFrame):
         self.upload_dataframe(df, "STRATEGY_PREDICTIONS")
+
+    # ---------------------------------------------------
+    # Convenience Upload Helpers - Competition Tables
+    # ---------------------------------------------------
+
+    def upload_competition_performance(self, df: pd.DataFrame):
+        """Upload performance data to COMPETITION_PERFORMANCE table"""
+        # Ensure only competition columns are present
+        required_cols = ['STRATEGY_NAME', 'TIMESTAMP', 'PORTFOLIO_VALUE', 'CASH']
+        df = df[required_cols].copy()
+        self.upload_dataframe(df, "COMPETITION_PERFORMANCE")
+
+    def upload_competition_positions(self, df: pd.DataFrame):
+        """Upload positions data to COMPETITION_POSITIONS table"""
+        # Ensure only competition columns are present
+        required_cols = ['STRATEGY_NAME', 'TIMESTAMP', 'SYMBOL', 
+                        'QUANTITY', 'MARKET_VALUE', 'AVG_PRICE']
+        df = df[required_cols].copy()
+        self.upload_dataframe(df, "COMPETITION_POSITIONS")
 
     # ---------------------------------------------------
 

@@ -25,7 +25,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling matching logo colors
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -34,63 +33,240 @@ st.markdown("""
         --kerdos-dark: #0f2438;
         --kerdos-white: #fffeff;
         --kerdos-blue: #29abd2;
-        --kerdos-light-gray: #f8f9fa;
+        --kerdos-light-gray: #f1e7cb;  /* Updated to your requested background */
         --kerdos-success: #28a745;
         --kerdos-warning: #fd7e14;
         --kerdos-danger: #dc3545;
+        --kerdos-accent: #5e17eb;     /* Updated to your requested purple */
+        --kerdos-pink: #e83e8c;
+        --kerdos-teal: #20c997;
+        --kerdos-text: #716037;       /* New: your requested text color */
     }
     
     .main {
         font-family: 'Inter', sans-serif;
+        background: #f1e7cb !important;  /* Updated background */
+        color: #716037 !important;       /* Updated text color */
     }
     
+    /* Update general text color */
+    .stApp {
+        background: #f1e7cb !important;
+        color: #716037 !important;
+    }
+    
+    /* Update text elements */
+    p, span, div, label {
+        color: #716037 !important;
+    }
+    
+    /* Enhanced button styling */
     .stButton > button {
         background: linear-gradient(135deg, var(--kerdos-dark), var(--kerdos-blue));
         color: var(--kerdos-white);
         border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
+        border-radius: 12px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-size: 14px;
+        letter-spacing: 0.025em;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 4px rgba(15, 36, 56, 0.15);
     }
     
     .stButton > button:hover {
         background: linear-gradient(135deg, var(--kerdos-blue), var(--kerdos-dark));
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(15, 36, 56, 0.25);
+    }
+    
+    .stButton > button:active {
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(15, 36, 56, 0.3);
+        box-shadow: 0 4px 8px rgba(15, 36, 56, 0.2);
+    }
+    
+    /* Enhanced dataframe styling */
+    .dataframe {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: none !important;
+        background: white !important;
     }
     
     .dataframe thead th {
-        background: var(--kerdos-dark) !important;
+        background: linear-gradient(135deg, var(--kerdos-dark), var(--kerdos-blue)) !important;
         color: var(--kerdos-white) !important;
-        border: 1px solid var(--kerdos-blue) !important;
+        border: none !important;
+        padding: 12px 16px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .dataframe tbody tr {
+        border-bottom: 1px solid #e9ecef !important;
+        transition: background-color 0.2s ease;
+        background: white !important;
     }
     
     .dataframe tbody tr:nth-child(even) {
-        background-color: #f8f9fa !important;
+        background-color: rgba(241, 231, 203, 0.3) !important;
+    }
+    
+    .dataframe tbody tr:hover {
+        background-color: rgba(41, 171, 210, 0.1) !important;
+    }
+    
+    .dataframe tbody td {
+        padding: 12px 16px !important;
+        font-size: 13px !important;
+        border: none !important;
+        color: #716037 !important;
+    }
+    
+    /* Metric cards enhancement */
+    [data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(94, 23, 235, 0.2);
+        padding: 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        border-color: var(--kerdos-accent);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(180deg, var(--kerdos-dark) 0%, #1a3a52 100%);
+    }
+    
+    .css-1d391kg .css-1v0mbdj {
+        color: var(--kerdos-white);
+    }
+    
+    /* Info/warning/success boxes */
+    .stAlert {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.9) !important;
+    }
+    
+    .stAlert[data-baseweb="notification"] {
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(40, 167, 69, 0.05));
+        border-left: 4px solid var(--kerdos-success);
+    }
+    
+    /* Selectbox and input styling */
+    .stSelectbox > div > div {
+        border-radius: 8px;
+        border: 2px solid rgba(94, 23, 235, 0.3);
+        transition: border-color 0.3s ease;
+        background: white !important;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: var(--kerdos-accent);
+        box-shadow: 0 0 0 3px rgba(94, 23, 235, 0.1);
+    }
+    
+    /* Custom progress bar */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, var(--kerdos-accent), var(--kerdos-success));
+    }
+    
+    /* Title styling with your purple */
+    h1 {
+        color: var(--kerdos-accent) !important;  /* Purple for main titles */
+        font-weight: 700 !important;
+        letter-spacing: -0.025em !important;
+    }
+    
+    h2 {
+        color: var(--kerdos-accent) !important;  /* Purple for section headers */
+        font-weight: 700 !important;
+        letter-spacing: -0.025em !important;
+    }
+    
+    h3 {
+        color: var(--kerdos-dark) !important;    /* Dark blue for subsections */
+        font-weight: 700 !important;
+        letter-spacing: -0.025em !important;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--kerdos-light-gray);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, var(--kerdos-accent), var(--kerdos-dark));
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, var(--kerdos-dark), var(--kerdos-accent));
+    }
+    
+    /* Update markdown text */
+    .markdown-text-container {
+        color: #716037 !important;
+    }
+    
+    /* Update all text in main content area */
+    .main .block-container {
+        color: #716037 !important;
+    }
+    
+    /* Ensure metric values use your text color */
+    [data-testid="metric-container"] [data-testid="metric-container"] {
+        color: #716037 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Define Kerdos color palette
+# Enhanced Kerdos color palette with your requested colors
 KERDOS_COLORS = {
-    'primary': '#0f2438',
-    'secondary': '#29abd2',
-    'white': '#fffeff',
-    'light_gray': '#f8f9fa',
-    'success': '#28a745',
-    'warning': '#fd7e14',
-    'danger': '#dc3545'
+    'primary': '#0f2438',        # Deep navy - primary brand color
+    'secondary': '#29abd2',      # Bright blue - secondary brand color
+    'white': '#fffeff',          # Pure white with subtle warmth
+    'light_gray': '#f1e7cb',     # Your requested background color
+    'success': '#28a745',        # Success green
+    'warning': '#fd7e14',        # Warning orange
+    'danger': '#dc3545',         # Danger red
+    'accent': '#5e17eb',         # Your requested purple accent
+    'pink': '#e83e8c',           # Pink accent
+    'teal': '#20c997',           # Teal accent
+    'dark_gray': '#6c757d',      # Text gray
+    'border': '#dee2e6',         # Border gray
+    'text': '#716037',           # Your requested text color
 }
 
+# Enhanced chart color sequence with your new colors
 CHART_COLOR_SEQUENCE = [
-    KERDOS_COLORS['primary'], 
-    KERDOS_COLORS['secondary'], 
-    KERDOS_COLORS['success'], 
-    KERDOS_COLORS['warning'],
-    '#6f42c1',  # Purple
-    '#e83e8c',  # Pink
-    '#20c997',  # Teal
+    KERDOS_COLORS['primary'],     # Dark navy - most important
+    KERDOS_COLORS['accent'],      # Purple - your accent color
+    KERDOS_COLORS['secondary'],   # Bright blue - secondary
+    KERDOS_COLORS['success'],     # Green - positive
+    KERDOS_COLORS['warning'],     # Orange - attention
+    KERDOS_COLORS['teal'],        # Teal - cool accent
+    KERDOS_COLORS['pink'],        # Pink - warm accent
+    KERDOS_COLORS['danger'],      # Red - negative/risk
+    '#8e44ad',                    # Deep purple
+    '#2c3e50',                    # Dark blue-gray
 ]
 
 # ============================================================================
@@ -114,45 +290,53 @@ def get_snowflake_connection():
         client_session_keep_alive=True
     )
 
-
 @st.cache_data(ttl="14400")
-def load_strategy_performance():
-    """Load performance data for all strategies"""
+def load_strategy_performance(mode="historical"):
+    """Load performance data - historical or competition mode"""
     conn = get_snowflake_connection()
-    
-    query = """
-    SELECT 
-        STRATEGY_NAME, TIMESTAMP, PORTFOLIO_VALUE, CASH, IS_OUT_OF_SAMPLE
-    FROM STRATEGY_PERFORMANCE
-    ORDER BY STRATEGY_NAME, TIMESTAMP
-    """
-    
+    if mode == "competition":
+        # Competition tables - Feb 28 onwards with $10k start
+        query = """
+        SELECT 
+            STRATEGY_NAME, TIMESTAMP, PORTFOLIO_VALUE, CASH
+        FROM COMPETITION_PERFORMANCE
+        ORDER BY STRATEGY_NAME, TIMESTAMP
+        """
+    else:
+        # Historical tables - full backtest
+        query = """
+        SELECT 
+            STRATEGY_NAME, TIMESTAMP, PORTFOLIO_VALUE, CASH, IS_OUT_OF_SAMPLE
+        FROM STRATEGY_PERFORMANCE
+        ORDER BY STRATEGY_NAME, TIMESTAMP
+        """
+
     df = pd.read_sql(query, conn)
     df['TIMESTAMP'] = pd.to_datetime(df['TIMESTAMP'])
     return df
 
-
 @st.cache_data(ttl="14400")
-def load_latest_positions(strategy_name):
-    """Load latest positions for a strategy"""
+def load_latest_positions(strategy_name, mode="historical"):
+    """Load latest positions - historical or competition mode"""
     conn = get_snowflake_connection()
-    
+    table = "COMPETITION_POSITIONS" if mode == "competition" else "STRATEGY_POSITIONS"
+
     query = f"""
     WITH latest_timestamp AS (
         SELECT MAX(TIMESTAMP) as max_ts
-        FROM STRATEGY_POSITIONS
+        FROM {table}
         WHERE STRATEGY_NAME = '{strategy_name}'
     )
     SELECT 
         p.SYMBOL,
         p.MARKET_VALUE
-    FROM STRATEGY_POSITIONS p
+    FROM {table} p
     JOIN latest_timestamp lt ON p.TIMESTAMP = lt.max_ts
     WHERE p.STRATEGY_NAME = '{strategy_name}'
     AND p.MARKET_VALUE > 0
     ORDER BY p.MARKET_VALUE DESC
     """
-    
+
     df = pd.read_sql(query, conn)
     return df
 
@@ -224,8 +408,15 @@ def calculate_comprehensive_metrics(returns, portfolio_values, risk_free_rate=0.
 # PAGE: FUND OVERVIEW
 # ============================================================================
 
-def render_fund_overview(perf_df):
+
+def render_fund_overview(perf_df, mode="historical"):
     """Render Fund Overview page with real allocation data"""
+    # ADD THIS AT THE VERY TOP OF THE FUNCTION (right after the docstring):
+    if mode == "competition":
+        st.info("""
+        🏆 **Competition Mode** — Viewing live performance from Feb 28, 2026 onwards  
+        Starting capital: $10,000 · End date: Apr 17, 2026 · Updates daily
+        """)
     
     # Logo
     cwd = os.path.dirname(__file__)
@@ -247,18 +438,38 @@ def render_fund_overview(perf_df):
     with st.container():
         st.markdown("### 🔍 Investment Thesis")
         st.markdown("""
-        The Kerdos Fund leverages advanced machine learning techniques to optimize asset allocation, 
-        aiming to minimize risk while maximizing returns. By dynamically adjusting portfolio weights 
-        based on predictive analytics, the fund seeks to outperform traditional benchmarks with a 
-        focus on risk-adjusted performance.
-        """)
+        The **Kerdos Fund** uses a three-layer machine learning architecture to allocate capital 
+        dynamically across seven complementary assets. Rather than chasing returns, we predict 
+        *risk* — using XGBoost to forecast next-day volatility per asset, then allocating 
+        inversely proportional to that risk. A direction classifier provides a soft bullish tilt,
+        and a regime filter scales down gross exposure when market-wide volatility spikes.
+
+        The result: **114% total return** (Jan 2024 – Feb 2026) with a **1.85 Sharpe ratio**, 
+        near-zero correlation to SPY (β = 0.05), and a max drawdown of only **-11.76%** 
+        vs SPY's -18.75%.""")
         
-        st.markdown("### 💡 Strategy Highlights")
+        st.markdown("### 💡 Strategy Highlights (Jan 2024 - Feb 2026)")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Return", "114%", "+66pp vs SPY")
+            st.metric("Sharpe Ratio", "1.85", "+0.84 vs SPY")
+        with col2:
+            st.metric("CAGR", "43.2%", "+22.9pp vs SPY")
+            st.metric("Max Drawdown", "-11.76%", "Better by 6.99pp")
+        with col3:
+            st.metric("Win Quarters", "88.9%", "8 of 9 profitable")
+            st.metric("Corr. to SPY", "0.05", "Near-zero dependency")
+
+        st.markdown("---")
         st.markdown("""
-        - Utilizes **XGBoost** for predictive modeling of asset returns and risks
-        - Targets a portfolio volatility of **15%** through risk optimization  
-        - Implements a **dynamic rebalancing strategy** based on market conditions
-        - Incorporates both traditional assets (equities, commodities) and alternative assets (crypto)
+        **How it works:**
+        - **Volatility model** (XGBoost Regressor, Bayesian-tuned): predicts next-day realised volatility 
+        using a 90-day rolling window of price, momentum, RSI, Bollinger Band, and cross-asset features
+        - **Direction classifier** (XGBoost Classifier, Bayesian-tuned): predicts P(return > 0) and applies a soft 
+        tilt — bullish assets receive proportionally higher weights
+        - **Regime filter**: monitors SPY realised vol; scales to 100% (CALM), 50–100% (CAUTION), 
+        or 30% (FEAR) gross exposure to protect capital during market stress
         """)
     
     # Asset universe + Current allocation
@@ -268,23 +479,46 @@ def render_fund_overview(perf_df):
     
     with col1:
         st.markdown("#### Core Holdings:")
-        
+
         assets = [
-            ("₿", "BTC-USD", "Bitcoin (Alternative Asset)"),
-            ("🇺🇸", "SPY", "S&P 500 ETF (Equity Exposure)"),
-            ("🥇", "GLD", "Gold ETF (Safe Haven Asset)"),
-            ("🥈", "SLV", "Silver ETF (Safe Haven Asset)"),
-            ("🖥️", "SMH", "Semiconductor ETF (AI Boom Exposure)"),
-            ("⚡", "ZAP", "Electrification ETF (AI Infrastructure)")
+            ("btc.png",  "BTC-USD", "Bitcoin",           "Crypto / Alternative — 24/7 liquidity, high-beta"),
+            ("spy.png", "SPY",     "S&P 500 ETF",        "US Large Cap Equity — core benchmark exposure"),
+            ("gld.png",  "GLD",     "Gold ETF",           "Safe Haven — crisis hedge, negative equity corr."),
+            ("slv.png",  "SLV",     "Silver ETF",         "Safe Haven — amplified metals, higher vol than gold"),
+            ("smh.png",  "SMH",     "Semiconductor ETF",  "AI / Tech — semiconductor cycle + AI boom"),
+            ("zap.png",  "ZAP",     "Electrification ETF","AI Infrastructure — energy transition theme"),
+            ("dfen.png",  "DFEN",    "Defense ETF",        "Geopolitical Hedge — low equity correlation"),
         ]
         
-        for emoji, symbol, description in assets:
-            st.markdown(f"**{emoji} {symbol}** - {description}")
+        # Create HTML with images
+        assets_html = ""
+        for img_file, symbol, description, details in assets:
+            img_path = os.path.join(os.path.dirname(__file__), 'assets', img_file)
+            
+            if os.path.exists(img_path):
+                # Convert image to base64 for embedding
+                import base64
+                with open(img_path, "rb") as f:
+                    img_data = base64.b64encode(f.read()).decode()
+                img_html = f'<img src="data:image/png;base64,{img_data}" style="width: 36px; height: 36px; vertical-align: top; margin-right: 8px;">'
+            else:
+                img_html = f'<span style="font-weight: bold; margin-right: 8px;">{symbol[0]}</span>'
+            
+            assets_html += f"""
+            <div style="margin-bottom: 12px;">
+                {img_html}
+                <strong>{symbol}</strong> - {description}
+                <br>
+                <span style="color: #716037; font-size: 0.85em; margin-left: 32px;">{details}</span>
+            </div>
+            """
+        
+        st.markdown(assets_html, unsafe_allow_html=True)
     
     with col2:
         # Get latest positions for ML strategy
         try:
-            positions_df = load_latest_positions("ML_XGBOOST")
+            positions_df = load_latest_positions("ML_XGBOOST", mode=mode)
             
             # Get latest portfolio data
             ml_df = perf_df[perf_df['STRATEGY_NAME'] == 'ML_XGBOOST'].sort_values('TIMESTAMP')
@@ -721,20 +955,96 @@ def render_performance_comparison(perf_df, risk_free_rate):
     
     st.plotly_chart(fig_dd, use_container_width=True)
 
+# ============================================================================
+# PAGE: PAPER TRADING PERFORMANCE
+# ============================================================================
+def render_trading_performance(perf_df, risk_free_rate, starting_capital, start_date, end_date):
+    """Render paper trading performance page with custom date range and capital"""
+    
+    st.title("📝 Paper Trading Performance")
+    
+    # Filter data for ML strategy and date range
+    ml_df = perf_df[perf_df['STRATEGY_NAME'] == 'ML_XGBOOST'].copy()
+    ml_df = ml_df.sort_values('TIMESTAMP')
+    ml_df = ml_df[(ml_df['TIMESTAMP'] >= pd.to_datetime(start_date)) & (ml_df['TIMESTAMP'] <= pd.to_datetime(end_date))]
+    
+    if ml_df.empty:
+        st.error("No data found for the selected date range.")
+        return
+    
+    # Adjust portfolio values to starting capital
+    initial_value = ml_df.iloc[0]['PORTFOLIO_VALUE']
+    ml_df['ADJUSTED_PORTFOLIO_VALUE'] = ml_df['PORTFOLIO_VALUE'] / initial_value * starting_capital
+    
+    # Calculate returns
+    ml_returns = ml_df['ADJUSTED_PORTFOLIO_VALUE'].pct_change().dropna()
+    
+    # Calculate metrics
+    ml_metrics = calculate_comprehensive_metrics(ml_returns, ml_df['ADJUSTED_PORTFOLIO_VALUE'], risk_free_rate)
+    
+    # Display key metrics
+    st.subheader("🔑 Key Performance Indicators")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Total Return",
+            f"{ml_metrics['Total Return']*100:.1f}%"
+        )
+    
+    with col2:
+        st.metric(
+            "CAGR",
+            f"{ml_metrics['CAGR']*100:.1f}%"
+        )
+    
+    with col3:
+        st.metric(
+            "Sharpe Ratio",
+            f"{ml_metrics['Sharpe Ratio']:.2f}"
+        )
+    
+    with col4:
+        st.metric(
+            "Max Drawdown",
+            f"{ml_metrics['Max Drawdown']*100:.1f}%",
+            delta_color="inverse"
+        )
+    
+    # Performance chart
+    st.subheader("📈 Cumulative Performance")
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=ml_df['TIMESTAMP'],
+        y=ml_df['ADJUSTED_PORTFOLIO_VALUE'],
+        mode='lines',
+        name='Kerdos Fund (Paper Trading)',
+        line=dict(color=KERDOS_COLORS['primary'], width=3)
+    ))
 
 # ============================================================================
 # MAIN APP
 # ============================================================================
 
 def main():
-    # Sidebar
     st.sidebar.title("🧭 Navigation")
     page = st.sidebar.selectbox(
-        "Choose a page:",
-        ["Fund Overview", "Performance & Benchmark"],
-        help="Navigate through different sections"
+    "Choose a page:",
+    ["Fund Overview", "Performance & Benchmark"], #, "Paper Trading Performance"],
+    help="Navigate through different sections"
     )
-    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 Data View")
+    view_mode = st.sidebar.radio(
+        "Select view:",
+        ["Historical (2024-2026)", "Competition (Feb 28 onwards)"],
+        help="Switch between full historical backtest and competition window"
+    )
+    mode = "competition" if "Competition" in view_mode else "historical"
+
     # Sidebar info
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
@@ -760,25 +1070,32 @@ def main():
     # Load data
     with st.spinner("Loading data from Snowflake..."):
         try:
-            perf_df = load_strategy_performance()
+            perf_df = load_strategy_performance(mode=mode)
             
             if perf_df.empty:
-                st.error("No data found in Snowflake. Please run the backtest first.")
-                st.info("Run: `python run_dual_backtest.py`")
+                if mode == "competition":
+                    st.error("No competition data found. Run: `python run_competition_backtest.py`")
+                else:
+                    st.error("No historical data found. Run: `python run_dual_backtest.py`")
                 return
             
-            st.sidebar.success(f"✅ Loaded {len(perf_df)} records")
-            
+            st.sidebar.success(f"✅ Loaded {len(perf_df)} records ({mode})")
         except Exception as e:
             st.error(f"Error loading data: {e}")
             return
     
     # Route to pages
     if page == "Fund Overview":
-        render_fund_overview(perf_df)
+        render_fund_overview(perf_df, mode=mode)
+    #elif page == "Paper Trading Performance":
+    #    # expand render_fund_overview to support trading with custom start and end dates
+    #    # with a starting capital of 10000 USD
+    #    starting_capital = st.input("Starting Capital (USD):", value=10000)
+    #    start_date = st.date_input("Start Date:", value=datetime(2024, 1, 1))
+    #    end_date = st.date_input("End Date:", value=datetime.now() - timedelta(days=1))
+    #    render_trading_performance(perf_df, risk_free_rate, starting_capital, start_date, end_date)
     else:
         render_performance_comparison(perf_df, risk_free_rate)
-
 
 if __name__ == "__main__":
     main()

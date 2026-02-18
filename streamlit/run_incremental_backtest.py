@@ -67,7 +67,7 @@ def get_last_date_in_snowflake(strategy_name):
         print(f"❌ Error checking Snowflake: {e}")
         return None, None
 
-def run_incremental_backtest(strategy_name, strategy_class, uploader):
+def run_incremental_backtest(strategy_name, strategy_class, uploader, backtest_start=datetime(2024, 1, 1), backtest_end=datetime.now() - timedelta(days=1)):
     """
     Run FULL backtest from beginning, but only log NEW dates
     

@@ -1,0 +1,33 @@
+{
+  "timestamp": "20260210_172604",
+  "volatility_model": {
+    "best_params": {
+      "n_estimators": 170,
+      "max_depth": 6,
+      "learning_rate": 0.10518315140805808,
+      "subsample": 0.5937670505460941,
+      "colsample_bytree": 0.625278386259008,
+      "min_child_weight": 4,
+      "gamma": 0.0010808372416145112,
+      "objective": "reg:squarederror",
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "best_r2": 0.11023258941057268
+  },
+  "return_model": {
+    "best_params": {
+      "n_estimators": 314,
+      "max_depth": 4,
+      "learning_rate": 0.013728250383906291,
+      "subsample": 0.6668543055695109,
+      "colsample_bytree": 0.5714334089609704,
+      "min_child_weight": 3,
+      "gamma": 0.010292247147901223,
+      "objective": "reg:squarederror",
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "best_r2": -0.0005792511499017605
+  }
+}

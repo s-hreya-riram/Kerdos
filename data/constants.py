@@ -11,7 +11,8 @@ ASSETS = [
     #("VXX", "VXX"),
     #("VCMDX", "VCMDX"),
     ("SMH", "SMH"),
-    ("ZAP", "ZAP")
+    ("ZAP", "ZAP"),
+    ("DFEN", "DFEN"),
 ]
 
 # Date ranges
@@ -27,7 +28,29 @@ NY_TZ = ZoneInfo('America/New_York')
 CRYPTO_SYMBOLS = lambda s: "/" in s or s.endswith("USD")
 
 # using the best hyperparameters found from hyperparameter_tuning.py using Bayesian Optimization
-XGB_MODEL_PARAMS = {'n_estimators': 496, 'max_depth': 6, 'learning_rate': 0.006804969902753306, 'subsample': 0.9209500039708808, 'colsample_bytree': 0.9546460881593619, 'min_child_weight': 6, 'gamma': 9.523455933694268e-05}
+XGB_MODEL_PARAMS = {
+        'n_estimators': 496, 
+        'max_depth': 6, 
+        'learning_rate': 0.006804969902753306, 
+        'subsample': 0.9209500039708808, 
+        'colsample_bytree': 0.9546460881593619, 
+        'min_child_weight': 6, 
+        'gamma': 9.523455933694268e-05
+    }
+
+# using the best hyperparameters found from direction_classifier_tuning.py using Bayesian Optimization
+DIRECTION_GATE_MODEL_PARAMS = {
+      "n_estimators": 170,
+      "max_depth": 6,
+      "learning_rate": 0.08736947857938814,
+      "subsample": 0.7586246422775976,
+      "colsample_bytree": 0.8809185628310966,
+      "min_child_weight": 6,
+      "gamma": 0.46245597701646834,
+      "reg_alpha": 0.5294464040779917,
+      "reg_lambda": 2.6028430990457374,
+      "scale_pos_weight": 1.20018714937626
+    }
 
 MAX_GROSS_EXPOSURE = 0.95
 MAX_POSITION_PCT = 0.33
