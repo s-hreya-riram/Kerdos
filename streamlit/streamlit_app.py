@@ -269,6 +269,10 @@ CHART_COLOR_SEQUENCE = [
     '#2c3e50',                    # Dark blue-gray
 ]
 
+competition_start = datetime(2026, 2, 28)
+competition_end = datetime(2026, 4, 17)
+current_date = datetime.now()
+
 # ============================================================================
 # SNOWFLAKE CONNECTION
 # ============================================================================
@@ -403,6 +407,34 @@ def calculate_comprehensive_metrics(returns, portfolio_values, risk_free_rate=0.
         'Longest DD Days': longest_dd_days,
     }
 
+# ============================================================================
+# COMPETITION STATUS
+# ============================================================================
+def get_competition_status():
+        """Get current competition status and messaging"""
+        
+        if current_date < competition_start:
+            days_until = (competition_start - current_date).days
+            return {
+                'status': 'preview',
+                'message': f"Competition starts in {days_until} days",
+                'color': 'info'
+            }
+        elif current_date <= competition_end:
+            days_running = (current_date - competition_start).days
+            total_days = (competition_end - competition_start).days
+            return {
+                'status': 'active',
+                'message': f"Competition active - Day {days_running} of {total_days}",
+                'color': 'success'
+            }
+        else:
+            return {
+                'status': 'completed',
+                'message': "Competition completed",
+                'color': 'warning'
+            }
+
 
 # ============================================================================
 # PAGE: FUND OVERVIEW
@@ -411,12 +443,17 @@ def calculate_comprehensive_metrics(returns, portfolio_values, risk_free_rate=0.
 
 def render_fund_overview(perf_df, mode="historical"):
     """Render Fund Overview page with real allocation data"""
-    # ADD THIS AT THE VERY TOP OF THE FUNCTION (right after the docstring):
     if mode == "competition":
-        st.info("""
-        🏆 **Competition Mode** — Viewing live performance from Feb 28, 2026 onwards  
-        Starting capital: $10,000 · End date: Apr 17, 2026 · Updates daily
-        """)
+        if current_date < competition_start:
+            st.info(f"""
+            🏆 **Competition Preview Mode** — Competition starts Feb 28, 2026  
+            Portfolio starts with $10,000 cash · Days until start: **{(competition_start - current_date).days}**
+            """)
+        else:
+            st.info("""
+            🏆 **Competition Mode** — Viewing live performance from Feb 28, 2026 onwards  
+            Starting capital: $10,000 · End date: Apr 17, 2026 · Updates daily
+            """)
     
     # Logo
     cwd = os.path.dirname(__file__)
@@ -518,32 +555,18 @@ def render_fund_overview(perf_df, mode="historical"):
     with col2:
         # Get latest positions for ML strategy
         try:
-            positions_df = load_latest_positions("ML_XGBOOST", mode=mode)
-            
-            # Get latest portfolio data
-            ml_df = perf_df[perf_df['STRATEGY_NAME'] == 'ML_XGBOOST'].sort_values('TIMESTAMP')
-            latest_cash = ml_df.iloc[-1]['CASH']
-            latest_portfolio_value = ml_df.iloc[-1]['PORTFOLIO_VALUE']
-
-            st.metric(
-                "Portfolio Value",
-                f"${latest_portfolio_value:,.2f}",
-                f"{(latest_portfolio_value/10000 - 1)*100:.1f}%",
-                help="Total portfolio value including all positions and cash"
-            )
-            
-            # Build allocation data
-            allocation_data = {}
-            
-            # Add positions
-            for _, row in positions_df.iterrows():
-                allocation_data[row['SYMBOL']] = row['MARKET_VALUE']
-            
-            # Add cash if > 0
-            if latest_cash > 0:
-                allocation_data['CASH'] = latest_cash
-            
-            if allocation_data:
+            # Competition preview mode - show $10k cash
+            if mode == "competition" and current_date < competition_start:
+                st.metric(
+                    "Portfolio Value",
+                    "$10,000.00",
+                    "0.0%",
+                    help="Starting portfolio value for competition (100% cash until Feb 28, 2026)"
+                )
+                
+                # Show 100% cash allocation
+                allocation_data = {'CASH': 10000}
+                
                 # Create pie chart
                 fig_pie = px.pie(
                     values=list(allocation_data.values()),
@@ -554,20 +577,70 @@ def render_fund_overview(perf_df, mode="historical"):
                 fig_pie.update_traces(
                     textposition='inside', 
                     textinfo='percent+label',
-                    textfont_size=12,
+                    textfont_size=16,
                     textfont_color='white'
                 )
                 fig_pie.update_layout(
-                    font=dict(family="Inter, sans-serif", size=12),
+                    font=dict(family="Inter, sans-serif", size=12, color=KERDOS_COLORS['text']),
                     plot_bgcolor='rgba(0,0,0,0)',
                     paper_bgcolor='rgba(0,0,0,0)',
-                    title_font_color=KERDOS_COLORS['primary'],
+                    title_font_color=KERDOS_COLORS['text'],
                     title_font_size=16
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
-
+                
             else:
-                st.warning("No position data available")
+                # Normal mode - load actual positions
+                positions_df = load_latest_positions("ML_XGBOOST", mode=mode)
+                
+                # Get latest portfolio data
+                ml_df = perf_df[perf_df['STRATEGY_NAME'] == 'ML_XGBOOST'].sort_values('TIMESTAMP')
+                latest_cash = ml_df.iloc[-1]['CASH']
+                latest_portfolio_value = ml_df.iloc[-1]['PORTFOLIO_VALUE']
+
+                st.metric(
+                    "Portfolio Value",
+                    f"${latest_portfolio_value:,.2f}",
+                    f"{(latest_portfolio_value/10000 - 1)*100:.1f}%",
+                    help="Total portfolio value including all positions and cash"
+                )
+                
+                # Build allocation data
+                allocation_data = {}
+                
+                # Add positions
+                for _, row in positions_df.iterrows():
+                    allocation_data[row['SYMBOL']] = row['MARKET_VALUE']
+                
+                # Add cash if > 0
+                if latest_cash > 0:
+                    allocation_data['CASH'] = latest_cash
+                
+                if allocation_data:
+                    # Create pie chart
+                    fig_pie = px.pie(
+                        values=list(allocation_data.values()),
+                        names=list(allocation_data.keys()),
+                        title="Current Portfolio Allocation",
+                        color_discrete_sequence=CHART_COLOR_SEQUENCE
+                    )
+                    fig_pie.update_traces(
+                        textposition='inside', 
+                        textinfo='percent+label',
+                        textfont_size=12,
+                        textfont_color='white'
+                    )
+                    fig_pie.update_layout(
+                        font=dict(family="Inter, sans-serif", size=12, color=KERDOS_COLORS['text']),
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        title_font_color=KERDOS_COLORS['text'],
+                        title_font_size=16
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+                else:
+                    st.warning("No position data available")
                 
         except Exception as e:
             st.error(f"Could not load position data: {e}")
@@ -698,12 +771,12 @@ def render_performance_comparison(perf_df, risk_free_rate):
         yaxis_title='Portfolio Value ($)',
         hovermode='x unified',
         height=500,
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family="Inter, sans-serif", color=KERDOS_COLORS['text']),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
         title="Cumulative Portfolio Value Over Time",
-        title_font_color=KERDOS_COLORS['primary'],
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        title_font_color=KERDOS_COLORS['text'],
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, font=dict(color=KERDOS_COLORS['text']))
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -848,19 +921,23 @@ def render_performance_comparison(perf_df, risk_free_rate):
                 title='Annualized Volatility (%)',
                 range=[min(all_x) - x_padding, max(all_x) + x_padding],
                 gridcolor='lightgray',
-                showgrid=True
+                showgrid=True,
+                title_font=dict(color=KERDOS_COLORS['text']),
+                tickfont=dict(color=KERDOS_COLORS['text'])
             ),
             yaxis=dict(
                 title='CAGR (%)',
                 range=[min(all_y) - y_padding, max(all_y) + y_padding],
                 gridcolor='lightgray',
-                showgrid=True
+                showgrid=True,
+                title_font=dict(color=KERDOS_COLORS['text']),
+                tickfont=dict(color=KERDOS_COLORS['text'])
             ),
             height=400,
-            font=dict(family="Inter, sans-serif"),
+            font=dict(family="Inter, sans-serif", color=KERDOS_COLORS['text']),
             plot_bgcolor='rgba(248, 249, 250, 0.5)',
             paper_bgcolor='rgba(0,0,0,0)',
-            title_font_color=KERDOS_COLORS['primary'],
+            title_font_color=KERDOS_COLORS['text'],
             showlegend=False
         )
         
@@ -947,10 +1024,13 @@ def render_performance_comparison(perf_df, risk_free_rate):
         yaxis_title="Drawdown (%)",
         hovermode='x unified',
         height=400,
-        font=dict(family="Inter, sans-serif"),
+        font=dict(family="Inter, sans-serif", color=KERDOS_COLORS['text']),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        title_font_color=KERDOS_COLORS['primary']
+        title_font_color=KERDOS_COLORS['text'],
+        xaxis=dict(title_font=dict(color=KERDOS_COLORS['text']), tickfont=dict(color=KERDOS_COLORS['text'])),
+        yaxis=dict(title_font=dict(color=KERDOS_COLORS['text']), tickfont=dict(color=KERDOS_COLORS['text'])),
+        legend=dict(font=dict(color=KERDOS_COLORS['text']))
     )
     
     st.plotly_chart(fig_dd, use_container_width=True)
@@ -1066,6 +1146,32 @@ def main():
         value=3.58,
         step=0.01
     ) / 100
+
+    competition_start = datetime(2026, 2, 28)
+    current_date = datetime.now()
+    
+    # Add competition status to sidebar
+    if "Competition" in view_mode:
+        status = get_competition_status()
+        if status['color'] == 'info':
+            st.sidebar.info(f"🕐 {status['message']}")
+        elif status['color'] == 'success':
+            st.sidebar.success(f"🏁 {status['message']}")
+        else:
+            st.sidebar.warning(f"🏆 {status['message']}")
+
+    if mode == "competition" and current_date < competition_start:
+        # Show preview message for competition mode before start date
+        st.info(f"""
+        🏆 **Competition Preview Mode**
+        
+        The competition starts on **February 28, 2026**. 
+        Currently showing historical data for preview.
+        
+        Days until competition start: **{(competition_start - current_date).days}**
+        """)
+        # Fall back to historical mode for data loading
+        mode = "historical"
     
     # Load data
     with st.spinner("Loading data from Snowflake..."):
@@ -1086,7 +1192,9 @@ def main():
     
     # Route to pages
     if page == "Fund Overview":
-        render_fund_overview(perf_df, mode=mode)
+        # Pass the original view mode for display purposes
+        original_mode = "competition" if "Competition" in view_mode else "historical"
+        render_fund_overview(perf_df, mode=original_mode)
     #elif page == "Paper Trading Performance":
     #    # expand render_fund_overview to support trading with custom start and end dates
     #    # with a starting capital of 10000 USD

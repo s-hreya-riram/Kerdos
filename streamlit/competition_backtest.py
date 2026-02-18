@@ -92,7 +92,7 @@ def run_competition_backtest():
     print(f"Start time: {datetime.now()}")
     
     # Competition parameters
-    START_DATE = datetime(2026, 2, 12) # TODO change back to Feb 28 after testing
+    START_DATE = datetime(2026, 2, 28)
     END_DATE = datetime(2026, 4, 17)
     INITIAL_CAPITAL = 10000
     

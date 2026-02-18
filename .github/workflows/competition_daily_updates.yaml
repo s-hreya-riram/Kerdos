@@ -1,4 +1,4 @@
-name: Deploy Streamlit Dashboard
+name: Daily updates since February trading window for the competition
 
 on:
   push:

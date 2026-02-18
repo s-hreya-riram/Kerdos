@@ -1,208 +1,174 @@
-## QF5208-AI-and-FinTech-AY2526SEM2 – Trading Strategy Assignment
+# Kerdos Fund — AI-Driven Multi-Asset Portfolio Strategy
 
-### 1. Assignment overview
+## What This Is
 
-In this assignment you will design, implement, and evaluate a systematic trading strategy using LumiBot and Alpaca.
+Kerdos Fund is an ML-driven portfolio that allocates across 7 assets (BTC, SPY, GLD, SLV, SMH, ZAP, DFEN) using three stacked models:
 
-Your core tasks are to:
+1. **Volatility predictor** (XGBoost Regressor) — predicts next-day realised vol; drives inverse-vol parity weights
+2. **Direction classifier** (XGBoost Classifier) — predicts P(return > 0); used as a soft allocation tilt
+3. **Regime filter** — scales gross exposure based on SPY realised vol (CALM / CAUTION / FEAR)
 
-- **Design and implement your own trading / portfolio strategy** in `strategies/strategy.py`.
-- **Backtest your strategy** over a historical period.
-- (Optional) **run it in paper-trading mode** on a live market feed.
-
-You will use:
-
-- **LumiBot** to manage strategies, brokers, and backtests.
-- **Alpaca** as a broker interface (paper account).
-- **Yahoo Finance** data (via LumiBot) for historical prices in backtests or possible model training.
+Backtest result (Jan 2024 – Feb 2026): **117% total return, 1.87 Sharpe, -11.8% max drawdown** vs SPY's 48% / 1.01 / -18.75%.
 
 ---
 
-### 2. Introduction
+## Project Structure
 
-- **LumiBot**
-  - An open-source **algorithmic trading framework** in Python.
-  - Docs: [LumiBot documentation](https://lumibot.lumiwealth.com/index.html).
-
-- **Alpaca**
-  - A broker with a well-documented **trading API**.
-  - Website: [https://alpaca.markets](https://alpaca.markets).
-
-In this repository, LumiBot + Alpaca are already wired up for you; you focus on **strategy logic**.
+```
+.
+├── config.py                        # Alpaca API keys + client setup
+├── run_backtest.py                  # Run a backtest (entry point)
+├── streamlit_app.py                 # Live dashboard
+├── data/
+│   ├── constants.py                 # Assets, hyperparams, position limits
+│   ├── data_fetcher.py              # Yahoo Finance (backtest) + Alpaca (live)
+│   ├── data_pipeline.py             # Feature engineering + ML prep
+│   ├── model.py                     # PortfolioRiskOptimizer + RegimeFilter
+│   └── utils.py                     # Timezone helpers
+├── strategies/
+│   ├── xgboost_strategy.py          # Main ML strategy (MLPortfolioStrategy)
+│   └── strategy.py                  # SPY buy-and-hold benchmark
+├── hyperparameter_tuning/
+│   └── hyperparameter_tuning.py     # Bayesian optimisation (Optuna)
+└── assets/
+    └── logo.png                     # Kerdos logo (used in dashboard)
+```
 
 ---
 
-### 3. Repository structure
+## Setup
 
-- **`backtest.py`**
-  - Runs a **backtest** of a strategy using historical data from Yahoo Finance.
-  - You will adapt this to backtest **your** `Strategy` from `strategies/strategy.py`.
+### 1. Install dependencies defined in requirements.txt
 
-- **`strategies/strategy.py`**
-  - The **main file you will edit**.
-  - Contains a subclass of `lumibot.strategies.Strategy` named `Strategy`.
-  - You will implement your logic primarily in:
-    - `initialize(self)`
-    - `on_trading_iteration(self)`
+```
+pip install requirements.txt
+```
 
-- **`strategies/example_strategy_1.py` – `example_strategy_5.py`**
-  - Example strategies provided as **reference**:
-    - Simple daily DCA into SPY.
-    - Buy-and-hold SPY.
-    - Equal-weight MAG7 portfolio.
-    - Permanent portfolio / all‑weather allocation.
-    - Simple ML-based BTC strategy using logistic regression.
-  - You are encouraged to read these files to understand LumiBot’s API and coding style.
+### 2. Configure API keys
+
+Create a `.env` file in the project root:
+
+```env
+ALPACA_API_KEY=your_alpaca_key
+ALPACA_API_SECRET=your_alpaca_secret
+
+SNOWFLAKE_USER=your_user
+SNOWFLAKE_PASSWORD=your_password
+SNOWFLAKE_ACCOUNT=your_account
+SNOWFLAKE_WAREHOUSE=your_warehouse
+SNOWFLAKE_DATABASE=your_database
+SNOWFLAKE_SCHEMA=PRODUCTION
+SNOWFLAKE_ROLE=ACCOUNTADMIN
+```
+
+> **Note:** Alpaca keys must be for a **paper trading** account. The strategy uses `PAPER: True` in `config.py`.  
+> Snowflake is only required for the live dashboard. Backtesting works without it.
 
 ---
 
-### 4. Setup instructions
+## Running a Backtest
 
-#### 4.1. Prerequisites
-
-- **Python 3.10+** (recommended)
-- A **code editor** (VS Code, PyCharm, Cursor, etc.)
-- Internet access
-
-#### 4.2. Create an Alpaca paper trading account
-
-1. Go to the Alpaca website ([https://alpaca.markets](https://alpaca.markets)) and create an account (if you already have one, we recommend registering a new one to separate it from any personal account).
-2. In your account dashboard, enable a **paper trading** account.
-3. Go to the Home page, scroll down to the API Keys section on the right, and click to generate your API Key and Secret.
-4. Note down:
-   - `ALPACA_API_KEY`
-   - `ALPACA_API_SECRET`
-
-#### 4.3. Clone this repository or download the code. Open the folder in your editor.
-
-#### 4.4. (Recommended) Create and activate a virtual environment
-
-Create a **virtual environment** so that assignment packages do not interfere with your global Python installation.
-
-- **On Windows (PowerShell or Command Prompt)**:
+Edit `run_backtest.py` to set your date range, then:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+python run_backtest.py
 ```
 
-- **On macOS / Linux**:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-You should now see `(.venv)` at the beginning of your terminal prompt. Remember to activate it each time you start a new terminal session.
-
-#### 4.5. Install Python dependencies
-
-With the virtual environment **activated**, run:
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-This will install all required libraries.
-
-#### 4.6. Create and modify your `.env` file
-
-Create a file named `.env` in the project root. Add the following lines, replacing the placeholders with your actual Alpaca API key and secret:
-
-```bash
-ALPACA_API_KEY=YOUR_ALPACA_API_KEY
-ALPACA_API_SECRET=YOUR_ALPACA_API_SECRET
-```
-
-The file `config.py` will load these values and build `ALPACA_CONFIG` for both backtesting and paper trading.
-
----
-
-### 5. Assignment tasks
-
-#### 5.1. Implement your strategy in `strategies/strategy.py`
-
-- Open `strategies/strategy.py`.
-- You will see a class definition:
+Key parameters in `run_backtest.py`:
 
 ```python
-from lumibot.strategies import Strategy
-
-
-class Strategy(Strategy):
-    ...
+backtesting_start = datetime(2024, 1, 1)    # change as needed
+backtesting_end   = datetime(2026, 2, 17)
+budget            = 10000                    # starting capital in USD
 ```
 
-This is your strategy class (a subclass of LumiBot’s `Strategy` base class).
+The backtest will:
+- Fetch price data from Yahoo Finance
+- Retrain all three models daily on a 90-day rolling window
+- Apply regime filtering and direction gating
+- Output a tearsheet HTML + trades CSV to the working directory
 
-You should:
+---
 
-- Implement **`initialize(self)`**.
-- Implement **`on_trading_iteration(self)`**.
-
-You may add **helper methods** or additional modules to keep your code organized.
-
-#### 5.2. Backtest your strategy
-
-1. Open `backtest.py`.
-2. Ensure it imports your `Strategy` if needed.
-3. You can set the **backtest period** and **initial budget** (or other attributes) to experiment with your strategy under different market conditions.
-4. Run the backtest from the project root:
+## Running the Dashboard
 
 ```bash
-python backtest.py  # make sure your .venv if you set up the virtual environment
+streamlit run streamlit_app.py
 ```
 
-The strategy will run in a simulated environment using historical data (from Yahoo Finance in this case).
-5. Two HTML files will open, showing the analysis of the backtest. You can also track the trading actions in the `logs` folder.
+The dashboard requires Snowflake credentials in `.env`. It shows:
+- Live portfolio allocation (pie chart, fetched from Snowflake)
+- Performance vs SPY benchmark
+- Drawdown analysis
+- Key metrics table
 
-#### 5.3. (Optional) Paper trade your strategy
+---
 
-Once your strategy is stable and you understand its behavior in backtests:
+## Key Configuration (`data/constants.py`)
 
-1. Open `paper_trade.py` and verify it uses your `Strategy` from `strategies/strategy.py`.
-2. Run:
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `MAX_GROSS_EXPOSURE` | 0.95 | Max portfolio deployment |
+| `MAX_POSITION_PCT` | 0.33 | Max weight per single asset |
+| `MIN_TRADE_DOLLARS` | 100 | Minimum order size |
+| `XGB_MODEL_PARAMS` | Bayesian-tuned | Vol + ret regressor hyperparams |
 
-```bash
-python paper_trade.py
+---
+
+## Key Strategy Parameters (`xgboost_strategy.py`)
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `lookback_days` | 90 | Rolling training window |
+| `direction_gate_threshold` | 0.0 | Soft tilt (0 = no hard gating) |
+| `regime_calm_threshold` | 0.12 | Below 12% ann. vol = full deploy |
+| `regime_fear_threshold` | 0.22 | Above 22% ann. vol = 30% deploy |
+| `min_cash_buffer` | 0.05 | Minimum 5% cash reserve |
+
+---
+
+## Assets Traded
+
+| Symbol | Name | Role |
+|--------|------|------|
+| BTC-USD / BTC/USD | Bitcoin | High-beta alternative; 24/7 liquidity |
+| SPY | S&P 500 ETF | Core equity exposure |
+| GLD | Gold ETF | Safe haven hedge |
+| SLV | Silver ETF | Amplified metals exposure |
+| SMH | Semiconductor ETF | AI/tech momentum |
+| ZAP | Electrification ETF | AI infrastructure theme |
+| DFEN | Defense ETF | Geopolitical uncertainty hedge |
+
+> Yahoo Finance symbols are used for backtesting; Alpaca symbols for live trading. Both are stored in `ASSETS` as `(alpaca_sym, yahoo_sym)` tuples.
+
+---
+
+## Reproducing the Main Backtest
+
+To reproduce the headline numbers (117% return, 1.87 Sharpe):
+
+```python
+# In run_backtest.py
+backtesting_start = datetime(2024, 1, 1)
+backtesting_end   = datetime(2026, 2, 17)
+budget            = 10000
+strategy = MLPortfolioStrategy(broker=broker, allow_shorts=True)
 ```
 
-This will:
+Expected output (approximate):
+- Total Return: ~117%
+- Sharpe Ratio: ~1.87
+- Max Drawdown: ~-11.8%
+- CAGR: ~44.1%
 
-- Connect to Alpaca’s **paper trading API** using the keys from `.env`.
-- Execute your strategy logic in near real time, sending orders to the paper account.
-- Make sure that you are using paper money instead of real money. **DO NOT DEPOSIT YOUR REAL MONEY INTO THIS ACCOUNT.**
-
----
-
-### 6. Suggested workflow
-
-- **Step 1**: Read the example strategies in `strategies/` to understand LumiBot’s API.
-- **Step 2**: Start simple (think about moving average, momentum, mean reversion, factor-based, or a simple ML signal).
-- **Step 3**: Implement your logic in `strategies/strategy.py`.
-- **Step 4**: Backtest with `backtest.py` over one or more historical periods.
-- **Step 5**: Analyze performance (returns, drawdowns, Sharpe, turnover, etc.) and refine.
+Runtime: approximately 10–20 minutes depending on machine speed (models retrain daily).
 
 ---
 
-### 7. What to submit
+## Notes for Markers
 
-- **Code**:
-  - Your completed `strategies/strategy.py`.
-  - Any additional helper modules (if allowed).
-  - `requirements.txt`: If your strategy uses any libraries not already listed in the default requirements.txt, you must manually add them to this file.
-- **Backtest results**:
-  - The `logs` folder (or selected log files) from your best-performing backtest, clearly labeled.
-
----
-
-Your goal is not just to “make money” in a backtest, but to **demonstrate understanding** of:
-
-- Systematic strategy design,
-- Proper use of trading APIs and backtesting tools,
-- And critical evaluation of quantitative trading results.
-
-Enjoy your exploration of trading.
-
-> This repository is for course instruction only. It does not provide investment advice or any recommendation to trade.
-
+- **No data leakage:** Training data always ends at `today - 1 day`. A runtime check raises `ValueError` if this is violated.
+- **Temporal validation split:** Train/val split is done by date (not row count) to prevent look-ahead bias.
+- **Hyperparameters** in `constants.py` were found via Bayesian optimisation (`hyperparameter_tuning/hyperparameter_tuning.py`) using Optuna with 5-fold time-series cross-validation.
+- **Weekend handling:** Stock positions are frozen on weekends; crypto positions can be adjusted 24/7.
+- **Backtesting uses Yahoo Finance** (free, no API key needed). Live trading uses Alpaca paper account.
