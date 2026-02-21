@@ -1,0 +1,35 @@
+{
+  "training_end_date": "2026-02-21",
+  "training_start_date": "2024-01-01",
+  "n_samples": 3608,
+  "features": [
+    "returns",
+    "volatility_20d",
+    "ma_ratio_20",
+    "rsi",
+    "bb_position",
+    "volume_ratio",
+    "momentum_20d",
+    "beta",
+    "correlation_market",
+    "relative_strength"
+  ],
+  "symbols": [
+    "BTC-USD",
+    "SPY",
+    "GLD",
+    "SLV",
+    "SMH",
+    "ZAP",
+    "DFEN"
+  ],
+  "val_metrics": {
+    "ret_r2": -0.9327129176512314,
+    "vol_r2": 0.9045433348794502,
+    "dir_acc": 0.5103092783505154,
+    "dir_auc": 0.4925089838156224,
+    "ret_mse": 0.0015406194660995075,
+    "vol_mse": 2.1340703442909542e-05
+  },
+  "created_at": "2026-02-21T22:24:16.261812"
+}

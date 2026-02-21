@@ -18,7 +18,7 @@ sys.path.insert(0, project_root)
 from config import ALPACA_CONFIG
 strategies_path = os.path.join(project_root, "strategies")
 sys.path.insert(0, strategies_path)
-from xgboost_strategy import MLPortfolioStrategy
+from strategy import MLPortfolioStrategy
 from spy_strategy import SPYBenchmarkStrategy
 sys.path.pop(0)
 

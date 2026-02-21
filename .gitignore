@@ -5,3 +5,5 @@ _pycache_/
 .pyc
 .venv/
 .DS_Store
+kerdos_submission/
+kerdos_submission.zip

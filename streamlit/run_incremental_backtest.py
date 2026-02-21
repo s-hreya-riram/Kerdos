@@ -10,7 +10,7 @@ sys.path.insert(0, project_root)
 
 from config import ALPACA_CONFIG
 from snowflake_logger import SnowflakeUploader
-from strategies.xgboost_strategy import MLPortfolioStrategy
+from strategies.strategy import MLPortfolioStrategy
 from strategies.spy_strategy import SPYBenchmarkStrategy
 from dual_backtest import create_callback_for_strategy
 

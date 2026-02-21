@@ -1,23 +1,17 @@
 from zoneinfo import ZoneInfo
+from datetime import datetime
 
 # Assets to trade, maintaining tuples with the Alpaca and Yahoo Finance symbols
 # Alpaca is used for training/live trading and Yahoo Finance is used for backtesting
 ASSETS = [
     ("BTC/USD", "BTC-USD"),
-    #("ETH/USD", "ETH-USD"),
     ("SPY", "SPY"),
     ("GLD", "GLD"),
     ("SLV", "SLV"),
-    #("VXX", "VXX"),
-    #("VCMDX", "VCMDX"),
     ("SMH", "SMH"),
     ("ZAP", "ZAP"),
     ("DFEN", "DFEN"),
 ]
-
-# Date ranges
-START_DATE = '2021-01-31'
-END_DATE = '2026-01-31'
 
 # Backtest settings
 REBALANCE_FREQUENCY = 'daily'
@@ -55,3 +49,5 @@ DIRECTION_GATE_MODEL_PARAMS = {
 MAX_GROSS_EXPOSURE = 0.95
 MAX_POSITION_PCT = 0.33
 MIN_TRADE_DOLLARS = 100
+
+CODE_SUBMISSION_DATE = datetime(2026, 2, 25)
