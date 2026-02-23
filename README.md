@@ -8,7 +8,54 @@ Kerdos Fund is an ML-driven portfolio that allocates across 7 assets (BTC, SPY, 
 2. **Direction classifier** (XGBoost Classifier) — predicts P(return > 0); used as a soft allocation tilt
 3. **Regime filter** — scales gross exposure based on SPY realised vol (CALM / CAUTION / FEAR)
 
-Backtest result (Jan 2024 – Feb 2026): **117% total return, 1.87 Sharpe, -11.8% max drawdown** vs SPY's 48% / 1.01 / -18.75%.
+Backtest result (Jan 2024 – Feb 2026): **112% total return, 1.89 Sharpe, -11.19% max drawdown** vs SPY's 46% / 0.99 / -18.75%.
+
+---
+
+## Performance Disclosure
+
+Kerdos Fund can operate in two modes:
+
+**Training mode (default):**
+
+* Models retrain daily on a 90-day rolling window
+* Runtime: ~1.8 seconds per trading day
+* Performance (Jan 2024 – Feb 2026): 112% return, 1.89 Sharpe
+* Advantages: Uses the most recent data; model adapts daily
+* Considerations: Slightly longer runtime during backtests or submissions
+
+**Pre-trained mode (configurable):**
+
+* Models loaded from disk (trained on Jan 2024 – Feb 2026)
+* Runtime: ~30–45 seconds for full competition period (faster than training mode)
+* Performance (single static model trained on Jan 2024 – Feb 2026, evaluated without rolling retraining): 105% return, 1.79 Sharpe
+* Advantages: Reduces computational load, ideal for rapid evaluation
+* Considerations: Models do not reflect the most recent data
+
+### Switching to Pre-Trained Mode
+
+In the init method of the strategy, update the `load_pretrained` attribute from False to True to leverage pretrained models.
+
+```python
+    def __init__(self,
+                 broker,
+                 performance_callback=None,
+                 optimizer=None,
+                 load_pretrained=True,  # UPDATE: Flag to control pre-trained vs. training mode; False = retraining, True = pretrained
+                 pretrained_path='models/portfolio_optimizer.pkl',  # Path to saved models
+                 min_samples=50,
+                 allow_shorts=False,
+                 max_short_exposure=0.30,
+                 min_cash_buffer=0.05,
+                 margin_requirement=1.5,
+                 weekend_crypto_adjustment=True,
+                 # Regime thresholds (annualised SPY realised vol)
+                 regime_calm_threshold=0.12,   # below 12% ann vol → full exposure
+                 regime_fear_threshold=0.22,   # above 22% ann vol → 30% exposure
+                 # Direction gate
+                 direction_gate_threshold=0.0,
+                 **kwargs)
+```
 
 ---
 
@@ -16,65 +63,77 @@ Backtest result (Jan 2024 – Feb 2026): **117% total return, 1.87 Sharpe, -11.8
 
 ```
 .
+├── README.md                        # This file
+├── backtest.py                      # Main backtest runner (entry point)
 ├── config.py                        # Alpaca API keys + client setup
-├── run_backtest.py                  # Run a backtest (entry point)
-├── streamlit_app.py                 # Live dashboard
+├── requirements.txt                 # Python dependencies
 ├── data/
+│   ├── __init__.py
 │   ├── constants.py                 # Assets, hyperparams, position limits
 │   ├── data_fetcher.py              # Yahoo Finance (backtest) + Alpaca (live)
 │   ├── data_pipeline.py             # Feature engineering + ML prep
 │   ├── model.py                     # PortfolioRiskOptimizer + RegimeFilter
 │   └── utils.py                     # Timezone helpers
 ├── strategies/
-│   ├── xgboost_strategy.py          # Main ML strategy (MLPortfolioStrategy)
-│   └── strategy.py                  # SPY buy-and-hold benchmark
-├── hyperparameter_tuning/
-│   └── hyperparameter_tuning.py     # Bayesian optimisation (Optuna)
-└── assets/
-    └── logo.png                     # Kerdos logo (used in dashboard)
+│   ├── __init__.py
+│   └── strategy.py                  # Main ML strategy (MLPortfolioStrategy)
+├── models/
+│   ├── portfolio_optimizer.pkl     # Pre-trained model (for pre-trained mode)
+│   └── training_metadata.json      # Model training metadata
+└── logs/                           # Backtest outputs
+    ├── best_results                # Best backtest results (retraining)
+    |      ├── *_tearsheet.html            # Performance tearsheet
+    |      ├── *_trades.csv                # Trade log
+    |      ├── *_stats.csv                 # Strategy statistics
+    |      └── *_indicators.csv            # Technical indicators
+    ├── pretrained                # Best backtest results (retraining)
+    |      ├── *_tearsheet.html            # Performance tearsheet
+    |      ├── *_trades.csv                # Trade log
+    |      ├── *_stats.csv                 # Strategy statistics
+    |      └── *_indicators.csv            # Technical indicators
+    ├── competition_period_in_2025         # Comparison against 2025 equivalent for the competiton timeframe
+    |      ├── *_tearsheet.html            # Performance tearsheet
+    |      ├── *_trades.csv                # Trade log
+    |      ├── *_stats.csv                 # Strategy statistics
+    |      └── *_indicators.csv            # Technical indicators
+    ├── *_tearsheet.html            # Performance tearsheet
+    ├── *_trades.csv                # Trade log
+    ├── *_stats.csv                 # Performance statistics
+    └── *_indicators.csv            # Technical indicators
 ```
 
 ---
 
 ## Setup
 
-### 1. Install dependencies defined in requirements.txt
+### 1. Install dependencies
 
-```
-pip install requirements.txt
+```bash
+pip install -r requirements.txt
 ```
 
-### 2. Configure API keys
+### 2. Configure API keys (Optional)
 
 Create a `.env` file in the project root:
 
 ```env
 ALPACA_API_KEY=your_alpaca_key
 ALPACA_API_SECRET=your_alpaca_secret
-
-SNOWFLAKE_USER=your_user
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_ACCOUNT=your_account
-SNOWFLAKE_WAREHOUSE=your_warehouse
-SNOWFLAKE_DATABASE=your_database
-SNOWFLAKE_SCHEMA=PRODUCTION
-SNOWFLAKE_ROLE=ACCOUNTADMIN
 ```
 
-> **Note:** Alpaca keys must be for a **paper trading** account. The strategy uses `PAPER: True` in `config.py`.  
-> Snowflake is only required for the live dashboard. Backtesting works without it.
+> **Note:** API keys are only required for live trading. Backtesting works without any API keys using Yahoo Finance data.
 
 ---
 
 ## Running a Backtest
 
-Edit `run_backtest.py` to set your date range, then:
+Edit `backtest.py` to set your date range, then:
 
 ```bash
-python run_backtest.py
+python backtest.py
 ```
 
-Key parameters in `run_backtest.py`:
+Key parameters in `backtest.py`:
 
 ```python
 backtesting_start = datetime(2024, 1, 1)    # change as needed
@@ -83,61 +142,54 @@ budget            = 10000                    # starting capital in USD
 ```
 
 The backtest will:
-- Fetch price data from Yahoo Finance
-- Retrain all three models daily on a 90-day rolling window
-- Apply regime filtering and direction gating
-- Output a tearsheet HTML + trades CSV to the working directory
 
----
+* Fetch price data from Yahoo Finance
+* Retrain all three models daily on a 90-day rolling window (training mode)
+* Apply regime filtering and direction gating
+* Output results to `logs/` directory:
 
-## Running the Dashboard
-
-```bash
-streamlit run streamlit_app.py
-```
-
-The dashboard requires Snowflake credentials in `.env`. It shows:
-- Live portfolio allocation (pie chart, fetched from Snowflake)
-- Performance vs SPY benchmark
-- Drawdown analysis
-- Key metrics table
+  * `*_tearsheet.html` - Performance tearsheet with charts
+  * `*_trades.csv` - Complete trade log
+  * `*_stats.csv` - Performance statistics
+  * `*_indicators.csv` - Technical indicators
 
 ---
 
 ## Key Configuration (`data/constants.py`)
 
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| `MAX_GROSS_EXPOSURE` | 0.95 | Max portfolio deployment |
-| `MAX_POSITION_PCT` | 0.33 | Max weight per single asset |
-| `MIN_TRADE_DOLLARS` | 100 | Minimum order size |
-| `XGB_MODEL_PARAMS` | Bayesian-tuned | Vol + ret regressor hyperparams |
+| Parameter              | Value          | Purpose                               |
+| ---------------------- | -------------- | ------------------------------------- |
+| `MAX_GROSS_EXPOSURE`   | 0.95           | Max portfolio deployment              |
+| `MAX_POSITION_PCT`     | 0.33           | Max weight per single asset           |
+| `MIN_TRADE_DOLLARS`    | 100            | Minimum order size                    |
+| `XGB_MODEL_PARAMS`     | Bayesian-tuned | Vol + ret regressor hyperparams       |
+| `CODE_SUBMISSION_DATE` | 2026-02-23     | Controls training vs pre-trained mode |
 
 ---
 
-## Key Strategy Parameters (`xgboost_strategy.py`)
+## Key Strategy Parameters (`strategies/strategy.py`)
 
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| `lookback_days` | 90 | Rolling training window |
-| `direction_gate_threshold` | 0.0 | Soft tilt (0 = no hard gating) |
-| `regime_calm_threshold` | 0.12 | Below 12% ann. vol = full deploy |
-| `regime_fear_threshold` | 0.22 | Above 22% ann. vol = 30% deploy |
-| `min_cash_buffer` | 0.05 | Minimum 5% cash reserve |
+| Parameter                  | Value | Purpose                          |
+| -------------------------- | ----- | -------------------------------- |
+| `lookback_days`            | 90    | Rolling training window          |
+| `direction_gate_threshold` | 0.0   | Soft tilt (0 = no hard gating)   |
+| `regime_calm_threshold`    | 0.12  | Below 12% ann. vol = full deploy |
+| `regime_fear_threshold`    | 0.22  | Above 22% ann. vol = 30% deploy  |
+| `min_cash_buffer`          | 0.05  | Minimum 5% cash reserve          |
 
 ---
 
 ## Assets Traded
 
-| Symbol | Name | Role |
-|--------|------|------|
-| BTC-USD / BTC/USD | Bitcoin | High-beta alternative; 24/7 liquidity |
-| SPY | S&P 500 ETF | Core equity exposure |
-| GLD | Gold ETF | Safe haven hedge |
-| SLV | Silver ETF | Amplified metals exposure |
-| SMH | Semiconductor ETF | AI/tech momentum |
-| ZAP | Electrification ETF | AI infrastructure theme |
-| DFEN | Defense ETF | Geopolitical uncertainty hedge |
+| Symbol            | Name                | Role                                  |
+| ----------------- | ------------------- | ------------------------------------- |
+| BTC-USD / BTC/USD | Bitcoin             | High-beta alternative; 24/7 liquidity |
+| SPY               | S&P 500 ETF         | Core equity exposure                  |
+| GLD               | Gold ETF            | Safe haven hedge                      |
+| SLV               | Silver ETF          | Amplified metals exposure             |
+| SMH               | Semiconductor ETF   | AI/tech momentum                      |
+| ZAP               | Electrification ETF | AI infrastructure theme               |
+| DFEN              | Defense ETF         | Geopolitical uncertainty hedge        |
 
 > Yahoo Finance symbols are used for backtesting; Alpaca symbols for live trading. Both are stored in `ASSETS` as `(alpaca_sym, yahoo_sym)` tuples.
 
@@ -145,30 +197,34 @@ The dashboard requires Snowflake credentials in `.env`. It shows:
 
 ## Reproducing the Main Backtest
 
-To reproduce the headline numbers (117% return, 1.87 Sharpe):
+To reproduce the headline numbers (112% return, 1.89 Sharpe):
 
 ```python
-# In run_backtest.py
-backtesting_start = datetime(2024, 1, 1)
-backtesting_end   = datetime(2026, 2, 17)
+# In backtest.py
+backtesting_start = datetime(2024, 1, 21)
+backtesting_end   = datetime(2026, 2, 21)
 budget            = 10000
-strategy = MLPortfolioStrategy(broker=broker, allow_shorts=True)
+strategy = MLPortfolioStrategy(broker=broker)
 ```
 
 Expected output (approximate):
-- Total Return: ~117%
-- Sharpe Ratio: ~1.87
-- Max Drawdown: ~-11.8%
-- CAGR: ~44.1%
+
+* Total Return: ~112%
+* Sharpe Ratio: ~1.89
+* Max Drawdown: ~-11.19%
+* CAGR: ~43.79%
 
 Runtime: approximately 10–20 minutes depending on machine speed (models retrain daily).
+
+The logs for the previous runs can be found in `logs/best_results`. Similarly results for the pretrained run can be found in `logs/pretrained`. The strategy was stress-tested under elevated volatility regimes (see `logs/competition_period_in_2025` for the relevant logs).
 
 ---
 
 ## Notes for Markers
 
-- **No data leakage:** Training data always ends at `today - 1 day`. A runtime check raises `ValueError` if this is violated.
-- **Temporal validation split:** Train/val split is done by date (not row count) to prevent look-ahead bias.
-- **Hyperparameters** in `constants.py` were found via Bayesian optimisation (`hyperparameter_tuning/hyperparameter_tuning.py`) using Optuna with 5-fold time-series cross-validation.
-- **Weekend handling:** Stock positions are frozen on weekends; crypto positions can be adjusted 24/7.
-- **Backtesting uses Yahoo Finance** (free, no API key needed). Live trading uses Alpaca paper account.
+* **No data leakage:** Training data always ends at `today - 1 day`. A runtime check raises `ValueError` if this is violated.
+* **Temporal validation split:** Train/val split is done by date (not row count) to prevent look-ahead bias.
+* **Hyperparameters** in `constants.py` were found via Bayesian optimisation using Optuna with 5-fold time-series cross-validation.
+* **Weekend handling:** Stock positions are frozen on weekends; crypto positions can be adjusted on any day.
+* **Backtesting uses Yahoo Finance** (free, no API key needed). Live trading uses Alpaca paper account.
+* **Pre-trained models** are included in `models/` directory for quick evaluation if needed.

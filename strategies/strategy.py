@@ -5,9 +5,12 @@ Supports two modes:
 1. Training mode (load_pretrained=False): Retrains models daily on 90-day rolling window
 2. Submission mode (load_pretrained=True): Loads pre-trained models from disk (no retraining)
 
-For competition submission, use submission mode to comply with computational constraints.
+Both modes are provided. Retraining completes is expected to complete in a few minutes (based on 
+~1.5 mins execution time on Macbook Air M3 with 16GB RAM for 48 days of training) for the 
+full competition window.
 """
 
+from anyio import current_time
 import numpy as np
 import pandas as pd
 from lumibot.strategies.strategy import Strategy
@@ -30,7 +33,7 @@ class MLPortfolioStrategy(Strategy):
         4. Weekend crypto adjustments are optional
         5. RegimeFilter  — continuous risk scaling (CALM / CAUTION / FEAR)
         6. Direction gating — weights suppressed for assets with P(up) < threshold
-        7. Pre-trained mode — loads models from disk (for submission compliance)
+        7. Pre-trained mode — loads models from disk (retraining by default, but can be disabled)
     """
 
     def __init__(self,
@@ -38,7 +41,7 @@ class MLPortfolioStrategy(Strategy):
                  performance_callback=None,
                  optimizer=None,
                  load_pretrained=False,  # Flag to control pre-trained vs. training mode; training model by default
-                 pretrained_path='models/portfolio_optimizer.pkl',  # NEW: Path to saved models
+                 pretrained_path='models/portfolio_optimizer.pkl',  # Path to saved models
                  min_samples=50,
                  allow_shorts=False,
                  max_short_exposure=0.30,
@@ -61,7 +64,6 @@ class MLPortfolioStrategy(Strategy):
         self.sleeptime = "1D"
         
         # NEW: Handle pre-trained vs. training mode
-        # load_pretrained = datetime.now() >= CODE_SUBMISSION_DATE
         self.load_pretrained = load_pretrained
         self.pretrained_path = pretrained_path
         
@@ -204,6 +206,8 @@ class MLPortfolioStrategy(Strategy):
 
     def on_trading_iteration(self):
         current_time = self.get_datetime()
+        cash = self.get_cash()
+        print(f"🔹 {current_time} | Cash available: ${cash:,.2f}")
         is_weekend   = self._is_weekend()
 
         print("\n" + "=" * 60)
@@ -279,35 +283,10 @@ class MLPortfolioStrategy(Strategy):
                 method="vol_parity",
             )
 
-            # ---- Weekend: freeze stock weights ----
-            if is_weekend:
-                print("   🌙 WEEKEND MODE: stock positions frozen")
-                portfolio_value   = self.portfolio_value
-                current_positions = {}
-                for sym in self.tradeable_symbols:
-                    pos = self.get_position(sym)
-                    if pos:
-                        price = self.get_last_price(sym)
-                        if price and price > 0:
-                            current_positions[sym] = (pos.quantity * price) / portfolio_value
-
-                adjusted_weights = {}
-                for sym, w in target_weights.items():
-                    if sym in self.stock_symbols:
-                        adjusted_weights[sym] = current_positions.get(sym, 0)
-                        print(f"   📊 {sym}: HOLD {adjusted_weights[sym]*100:.1f}%")
-                    else:
-                        adjusted_weights[sym] = w
-                        print(f"   📊 {sym}: TARGET {w*100:.1f}% (crypto)")
-
-                weights = adjusted_weights
-            else:
-                weights = target_weights
-
             # ---- Position sizing ----
             # Clip per-asset, renormalise, then apply gross exposure * regime scale.
             # regime_scale applied exactly once here — not inside optimal_weights().
-            weights = {sym: max(0, w) for sym, w in weights.items()}
+            weights = {sym: max(0, w) for sym, w in target_weights.items()}
 
             clipped_weights = {
                 sym: float(np.clip(w, 0, MAX_POSITION_PCT))
@@ -321,6 +300,33 @@ class MLPortfolioStrategy(Strategy):
                 sym: w * MAX_GROSS_EXPOSURE * scale
                 for sym, w in clipped_weights.items()
             }
+
+            # ---- Weekend: freeze stock weights ----
+            if is_weekend:
+                print("   🌙 WEEKEND MODE: stock positions frozen")
+                portfolio_value   = self.portfolio_value
+                current_positions = {}
+                for sym in self.tradeable_symbols:
+                    pos = self.get_position(sym)
+                    if pos:
+                        # for crypto symbols, split the symbol to symbol and quote (e.g. BTC/USD → BTC), and fetch price using the Alpaca symbol format if in live trading
+                        if sym == "BTC/USD":
+                            price = self.get_last_price(asset="BTC", quote="USD")
+                        else:
+                            price = self.get_last_price(sym)
+                        if price and price > 0:
+                            current_positions[sym] = (pos.quantity * price) / portfolio_value
+
+                adjusted_weights = {}
+                for sym, w in weights.items():
+                    if sym in self.stock_symbols:
+                        adjusted_weights[sym] = current_positions.get(sym, 0)
+                        print(f"   📊 {sym}: HOLD {adjusted_weights[sym]*100:.1f}%")
+                    else:
+                        adjusted_weights[sym] = w
+                        print(f"   📊 {sym}: TARGET {w*100:.1f}% (crypto)")
+
+                weights = adjusted_weights
 
             # ---- Store for callback ----
             self.latest_predictions = {
@@ -354,12 +360,32 @@ class MLPortfolioStrategy(Strategy):
                     continue
 
                 target_dollars = w * portfolio_value
-                price = self.get_last_price(sym)
-                if not price or price <= 0:
-                    continue
+                if sym in self.crypto_symbols and not self.is_backtesting:
+                    from lumibot.entities import Asset
+                    crypto_symbol = sym.split('/')[0]  # "BTC/USD" → "BTC"
+                    crypto_asset = Asset(symbol=crypto_symbol, asset_type="crypto")
+                    usd_asset = Asset(symbol="USD", asset_type="crypto")
+                    price = self.get_last_price(crypto_asset, quote=usd_asset)
+                else:
+                    price = self.get_last_price(sym)
 
-                target_qty  = round(target_dollars / price, 4)
-                if abs(target_qty) < 0.0001:
+                # Sanity check for crypto prices
+                if sym in self.crypto_symbols and not self.is_backtesting:
+                    crypto_symbol = sym.split('/')[0]
+                    if crypto_symbol == "BTC" and price < 10000:
+                        print(f"   ⚠️  {sym}: Price ${price:,.2f} looks suspiciously low. Skipping.")
+                        continue
+                
+                if not price or price <= 0:
+                    print(f"   ⚠️  {sym}: Invalid price {price}")
+                    continue
+                    
+                print(f"   💵 {sym}: ${price:,.2f}")
+                decimals = 8 if sym in self.crypto_symbols else 4
+                target_qty = round(target_dollars / price, decimals)
+
+                min_qty = 0.00000001 if sym in self.crypto_symbols else 0.0001
+                if abs(target_qty) < min_qty:
                     continue
 
                 current_pos = self.get_position(sym)
@@ -375,16 +401,23 @@ class MLPortfolioStrategy(Strategy):
                 delta_dollars = delta_qty * price
 
                 if delta_qty > 0 and delta_dollars > available_for_longs:
-                    delta_qty     = available_for_longs / price
-                    delta_dollars = delta_qty * price
-                    if delta_qty < 0.0001:
-                        continue
+                    print(f"   ⚠️  {sym}: Need ${delta_dollars:,.2f} but only ${available_for_longs:,.2f} available. Skipping.")
+                    continue
 
                 if abs(delta_dollars) < MIN_TRADE_DOLLARS:
                     continue
 
-                side  = "buy" if delta_qty > 0 else "sell"
-                order = self.create_order(sym, abs(delta_qty), side)
+                side = "buy" if delta_qty > 0 else "sell"
+                # Create order - crypto needs Asset objects
+                if sym in self.crypto_symbols and not self.is_backtesting:
+                    from lumibot.entities import Asset
+                    crypto_symbol = sym.split('/')[0]  # "BTC/USD" → "BTC"
+                    order_asset = Asset(symbol=crypto_symbol, asset_type="crypto")
+                    quote_asset = Asset(symbol="USD", asset_type="crypto")
+                    order = self.create_order(order_asset, abs(delta_qty), side, quote=quote_asset)
+                else:
+                    order = self.create_order(sym, abs(delta_qty), side)
+
                 self.submit_order(order)
 
                 available_for_longs -= delta_dollars if side == "buy" else -abs(delta_dollars)
