@@ -15,8 +15,13 @@ def run_backtest():
 
     # Define the backtest environment
     # You can find more information about the backtest environment here: https://lumibot.lumiwealth.com/backtesting.backtesting_function.html
+<<<<<<< Updated upstream
     backtesting_start = datetime(2025, 3, 1)
     backtesting_end = datetime(2025, 4, 15)
+=======
+    backtesting_start = datetime(2024, 1, 21)
+    backtesting_end = datetime(2026, 2, 21)
+>>>>>>> Stashed changes
     budget = 10000
 
     # Instantiate the strategy

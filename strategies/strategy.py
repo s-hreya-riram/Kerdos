@@ -72,7 +72,7 @@ class MLPortfolioStrategy(Strategy):
         # Defensive Thresholds
         self.kill_switch_pct = 0.06
         self.is_killed = False
-        self.drift_hurdle = 0.002 # Set to 0.1% as per your header note
+        self.drift_hurdle = 0.002 # Set to 0.2% as per your header note
 
         self.min_samples = min_samples
         self.weekend_crypto_adjustment = weekend_crypto_adjustment
