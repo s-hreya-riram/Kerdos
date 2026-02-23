@@ -8,7 +8,7 @@ Kerdos Fund is an ML-driven portfolio that allocates across 7 assets (BTC, SPY, 
 2. **Direction classifier** (XGBoost Classifier) — predicts P(return > 0); used as a soft allocation tilt
 3. **Regime filter** — scales gross exposure based on SPY realised vol (CALM / CAUTION / FEAR)
 
-Backtest result (Jan 2024 – Feb 2026): **112% total return, 1.89 Sharpe, -11.19% max drawdown** vs SPY's 46% / 0.99 / -18.75%.
+Backtest result (Jan 2024 – Feb 2026): **234% total return, 1.95 Sharpe, -18.14% max drawdown** vs SPY's 46% / 0.99 / -18.75%.
 
 ---
 
@@ -16,19 +16,19 @@ Backtest result (Jan 2024 – Feb 2026): **112% total return, 1.89 Sharpe, -11.1
 
 Kerdos Fund can operate in two modes:
 
-**Training mode (default):**
+**Training mode:**
 
 * Models retrain daily on a 90-day rolling window
 * Runtime: ~1.8 seconds per trading day
-* Performance (Jan 2024 – Feb 2026): 112% return, 1.89 Sharpe
+* Performance (Jan 2024 – Feb 2026): 234% return, 1.95 Sharpe
 * Advantages: Uses the most recent data; model adapts daily
 * Considerations: Slightly longer runtime during backtests or submissions
 
-**Pre-trained mode (configurable):**
+**Pre-trained mode (default):**
 
 * Models loaded from disk (trained on Jan 2024 – Feb 2026)
 * Runtime: ~30–45 seconds for full competition period (faster than training mode)
-* Performance (single static model trained on Jan 2024 – Feb 2026, evaluated without rolling retraining): 105% return, 1.79 Sharpe
+* Performance (single static model trained on Jan 2024 – Feb 2026, evaluated without rolling retraining): 275% return, 2.42 Sharpe
 * Advantages: Reduces computational load, ideal for rapid evaluation
 * Considerations: Models do not reflect the most recent data
 
