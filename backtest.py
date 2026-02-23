@@ -15,8 +15,8 @@ def run_backtest():
 
     # Define the backtest environment
     # You can find more information about the backtest environment here: https://lumibot.lumiwealth.com/backtesting.backtesting_function.html
-    backtesting_start = datetime(2026, 1, 21)
-    backtesting_end = datetime(2026, 2, 21)
+    backtesting_start = datetime(2025, 3, 1)
+    backtesting_end = datetime(2025, 4, 15)
     budget = 10000
 
     # Instantiate the strategy
