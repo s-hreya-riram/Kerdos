@@ -8,7 +8,7 @@ Kerdos Fund is an ML-driven portfolio that allocates across 7 assets (BTC, SPY, 
 2. **Direction classifier** (XGBoost Classifier) — predicts P(return > 0); used as a soft allocation tilt
 3. **Regime filter** — scales gross exposure based on SPY realised vol (CALM / CAUTION / FEAR)
 
-Backtest result (Jan 2024 – Feb 2026): **234% total return, 1.95 Sharpe, -18.14% max drawdown** vs SPY's 46% / 0.99 / -18.75%.
+Backtest result (Jan 2024 – Feb 2026): **275% total return, 2.42 Sharpe, -13.33% max drawdown** vs SPY's 46% / 0.99 / -18.75%.
 
 ---
 
@@ -32,9 +32,9 @@ Kerdos Fund can operate in two modes:
 * Advantages: Reduces computational load, ideal for rapid evaluation
 * Considerations: Models do not reflect the most recent data
 
-### Switching to Pre-Trained Mode
+### Switching to Pre-Trained Mode (not recommended for now)
 
-In the init method of the strategy, update the `load_pretrained` attribute from False to True to leverage pretrained models.
+In the init method of the strategy, update the `load_pretrained` attribute from True to False to re-train the models.
 
 ```python
     def __init__(self,
@@ -81,17 +81,17 @@ In the init method of the strategy, update the `load_pretrained` attribute from 
 │   ├── portfolio_optimizer.pkl     # Pre-trained model (for pre-trained mode)
 │   └── training_metadata.json      # Model training metadata
 └── logs/                           # Backtest outputs
-    ├── best_results                # Best backtest results (retraining)
+    ├── best_results                # Best backtest results (pre-trained)
     |      ├── *_tearsheet.html            # Performance tearsheet
     |      ├── *_trades.csv                # Trade log
     |      ├── *_stats.csv                 # Strategy statistics
     |      └── *_indicators.csv            # Technical indicators
-    ├── pretrained                # Best backtest results (retraining)
+    ├── retraining                # Best backtest results (retraining)
     |      ├── *_tearsheet.html            # Performance tearsheet
     |      ├── *_trades.csv                # Trade log
     |      ├── *_stats.csv                 # Strategy statistics
     |      └── *_indicators.csv            # Technical indicators
-    ├── competition_period_in_2025         # Comparison against 2025 equivalent for the competiton timeframe
+    ├── competition_period_in_2025         # Comparison against 2025 equivalent for the competiton timeframe (pre-trained)
     |      ├── *_tearsheet.html            # Performance tearsheet
     |      ├── *_trades.csv                # Trade log
     |      ├── *_stats.csv                 # Strategy statistics
@@ -136,8 +136,8 @@ python backtest.py
 Key parameters in `backtest.py`:
 
 ```python
-backtesting_start = datetime(2024, 1, 1)    # change as needed
-backtesting_end   = datetime(2026, 2, 17)
+backtesting_start = datetime(2024, 1, 21)    # change as needed
+backtesting_end   = datetime(2026, 2, 21)
 budget            = 10000                    # starting capital in USD
 ```
 
@@ -209,14 +209,14 @@ strategy = MLPortfolioStrategy(broker=broker)
 
 Expected output (approximate):
 
-* Total Return: ~112%
-* Sharpe Ratio: ~1.89
-* Max Drawdown: ~-11.19%
-* CAGR: ~43.79%
+* Total Return: ~275%
+* Sharpe Ratio: ~2.42
+* Max Drawdown: ~-13.33%
+* CAGR: ~89.0%
 
-Runtime: approximately 10–20 minutes depending on machine speed (models retrain daily).
+Runtime: approximately 10–20 minutes depending on machine speed.
 
-The logs for the previous runs can be found in `logs/best_results`. Similarly results for the pretrained run can be found in `logs/pretrained`. The strategy was stress-tested under elevated volatility regimes (see `logs/competition_period_in_2025` for the relevant logs).
+The logs for the previous runs can be found in `logs/best_results`. Similarly results for the re-training run can be found in `logs/retraining`. The strategy was stress-tested under elevated volatility regimes (see `logs/competition_period_in_2025` for the relevant logs).
 
 ---
 
