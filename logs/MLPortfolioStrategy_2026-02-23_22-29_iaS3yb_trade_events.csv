@@ -1,0 +1,1 @@
+time,strategy,exchange,identifier,symbol,side,type,status,price,filled_quantity,multiplier,trade_cost,trade_slippage,time_in_force,asset.right,asset.strike,asset.multiplier,asset.expiration,asset.asset_type,price_source
