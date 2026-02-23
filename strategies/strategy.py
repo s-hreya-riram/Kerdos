@@ -36,7 +36,7 @@ class MLPortfolioStrategy(Strategy):
                  broker,
                  performance_callback=None,
                  optimizer=None,
-                 load_pretrained=False,
+                 load_pretrained=True,
                  pretrained_path='models/portfolio_optimizer.pkl',
                  min_samples=50,
                  allow_shorts=False,
