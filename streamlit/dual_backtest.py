@@ -73,6 +73,10 @@ def create_callback_for_strategy(uploader, strategy_name, last_date_in_db=None):
         else:
             current_date = pd.to_datetime(timestamp)
         current_date_utc = to_utc(current_date)
+
+        if current_date_utc.hour != 16 or current_date_utc.minute != 0:
+            return
+
         # ========== SMART DATE FILTERING ==========
         if last_date_in_db is not None:
             # Incremental mode: Skip dates we already have

@@ -41,6 +41,9 @@ def create_competition_callback(uploader, strategy_name):
         
         current_date = pd.to_datetime(timestamp)
         current_date_utc = to_utc(current_date)
+
+        if current_date_utc.hour != 16 or current_date_utc.minute != 0:
+            return
         
         print(f"      💾 Competition: {current_date_utc.date()} | ${portfolio_value:,.2f}")
         
