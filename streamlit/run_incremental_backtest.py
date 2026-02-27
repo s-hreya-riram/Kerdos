@@ -66,15 +66,11 @@ def get_last_date_in_snowflake(strategy_name):
     except Exception as e:
         print(f"❌ Error checking Snowflake: {e}")
         return None, None
-
-def run_incremental_backtest(strategy_name, strategy_class, uploader, backtest_start=datetime(2024, 1, 1), backtest_end=datetime.now() - timedelta(days=1)):
-    """
-    Run FULL backtest from beginning, but only log NEW dates
     
-    Key insight:
-    - Always backtest from 2024-01-01 to today
-    - This ensures positions carry forward correctly
-    - But only log dates we don't already have
+def run_incremental_backtest(strategy_name, strategy_class, uploader):
+    """
+    Run FULL backtest, then update Snowflake with ALL data
+    This ensures returns chain is never broken
     """
     
     print(f"\n{'='*60}")
@@ -84,9 +80,9 @@ def run_incremental_backtest(strategy_name, strategy_class, uploader, backtest_s
     # Get last date in Snowflake
     last_date, _ = get_last_date_in_snowflake(strategy_name)
     
-    # Define backtest range
+    # Define backtest range (ALWAYS FULL)
     backtest_start = datetime(2024, 1, 1)
-    backtest_end = datetime.now() - timedelta(days=1)  # Yesterday
+    backtest_end = datetime.now() - timedelta(days=1)
     
     # Skip weekends
     while backtest_end.weekday() >= 5:
@@ -94,40 +90,38 @@ def run_incremental_backtest(strategy_name, strategy_class, uploader, backtest_s
     
     if last_date:
         print(f"📊 Last data in DB: {last_date.date()}")
-        print(f"📈 Will backtest: {backtest_start.date()} → {backtest_end.date()}")
-        print(f"💾 Will only LOG data after: {last_date.date()}")
         
         # Check if up-to-date
         if last_date.date() >= backtest_end.date():
             print(f"✅ {strategy_name} already up-to-date!")
             return True
-    else:
-        print(f"⚠️  No existing data - running FULL backtest")
-        print(f"📈 Will backtest: {backtest_start.date()} → {backtest_end.date()}")
-        print(f"💾 Will log ALL data")
+        
+        print(f"📈 Running FULL backtest to ensure data continuity")
+        # NEW: Delete old data and rewrite (ensures consistency)
+        print(f"🗑️  Clearing old {strategy_name} data...")
+        delete_strategy_data(strategy_name)
     
-    # Create callback with date filter
+    print(f"💾 Will log ALL data from {backtest_start.date()} to {backtest_end.date()}")
+    
+    # Create callback WITHOUT date filter
     callback = create_callback_for_strategy(
         uploader, 
         strategy_name, 
-        last_date  # ← Pass last date to filter
+        None  # ← No date filter, log everything
     )
     
     try:
-        # ========== RUN FULL BACKTEST ==========
-        # This ensures positions carry forward correctly
         result = strategy_class.run_backtest(
             YahooDataBacktesting,
-            backtest_start,  # Always from beginning
+            backtest_start,
             backtest_end,
-            budget=10000,  # Always start with $10k (positions will build up)
+            budget=10000,
             show_plot=False,
             save_tearsheet=False,
             parameters={
                 "performance_callback": callback
             }
         )
-        # ========== END BACKTEST ==========
         
         print(f"✅ {strategy_name} backtest complete")
         return True
@@ -137,6 +131,34 @@ def run_incremental_backtest(strategy_name, strategy_class, uploader, backtest_s
         import traceback
         traceback.print_exc()
         return False
+
+
+def delete_strategy_data(strategy_name):
+    """Delete existing data for a strategy before rewriting"""
+    try:
+        conn = snowflake.connector.connect(
+            user=os.getenv("SNOWFLAKE_USER"),
+            password=os.getenv("SNOWFLAKE_PASSWORD"),
+            account=os.getenv("SNOWFLAKE_ACCOUNT"),
+            warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
+            database=os.getenv("SNOWFLAKE_DATABASE"),
+            schema=os.getenv("SNOWFLAKE_SCHEMA", "PRODUCTION")
+        )
+        
+        cursor = conn.cursor()
+        cursor.execute(f"USE WAREHOUSE {os.getenv('SNOWFLAKE_WAREHOUSE')}")
+        
+        # Delete from both tables
+        cursor.execute(f"DELETE FROM STRATEGY_PERFORMANCE WHERE STRATEGY_NAME = '{strategy_name}'")
+        cursor.execute(f"DELETE FROM STRATEGY_POSITIONS WHERE STRATEGY_NAME = '{strategy_name}'")
+        
+        cursor.close()
+        conn.close()
+        
+        print(f"✅ Deleted old {strategy_name} data")
+        
+    except Exception as e:
+        print(f"⚠️  Could not delete old data: {e}")
 
 
 def main():

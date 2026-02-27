@@ -479,24 +479,20 @@ def render_fund_overview(perf_df, mode="historical"):
         dynamically across seven complementary assets. Rather than chasing returns, we predict 
         *risk* — using XGBoost to forecast next-day volatility per asset, then allocating 
         inversely proportional to that risk. A direction classifier provides a soft bullish tilt,
-        and a regime filter scales down gross exposure when market-wide volatility spikes.
-
-        The result: **114% total return** (Jan 2024 – Feb 2026) with a **1.85 Sharpe ratio**, 
-        near-zero correlation to SPY (β = 0.05), and a max drawdown of only **-11.76%** 
-        vs SPY's -18.75%.""")
+        and a regime filter scales down gross exposure when market-wide volatility spikes.""")
         
-        st.markdown("### 💡 Strategy Highlights (Jan 2024 - Feb 2026)")
+        st.markdown("### 💡 Strategy Highlights (Jan 1, 2024 - Feb 26, 2026)")
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Total Return", "114%", "+66pp vs SPY")
-            st.metric("Sharpe Ratio", "1.85", "+0.84 vs SPY")
+            st.metric("Total Return", "118.3%", "+74.8% vs SPY")
+            st.metric("Sharpe Ratio", "1.91", "+0.99 vs SPY")
         with col2:
-            st.metric("CAGR", "43.2%", "+22.9pp vs SPY")
-            st.metric("Max Drawdown", "-11.76%", "Better by 6.99pp")
+            st.metric("CAGR", "44.0%", "+25.7pp vs SPY")
+            st.metric("Max Drawdown", "-11.7%", "Better by 7.4pp")
         with col3:
-            st.metric("Win Quarters", "88.9%", "8 of 9 profitable")
-            st.metric("Corr. to SPY", "0.05", "Near-zero dependency")
+            st.metric("Calmar Ratio", "3.75", "+2.75pp vs SPY")
+            st.metric("Corr. to SPY", "0.06", "Near-zero dependency")
 
         st.markdown("---")
         st.markdown("""
@@ -665,7 +661,7 @@ def render_fund_overview(perf_df, mode="historical"):
         st.info("""
         **📅 Final Investment Window**
         
-        **March 17, 2026**
+        **March 20, 2026**
         
         💰 Recommended Minimum Investment: $1000
         """)
@@ -1134,7 +1130,7 @@ def main():
     **Next Investment Window** \n
     Feb 28, 2026 \n
     **Final Window** \n 
-    Mar 17, 2026
+    Mar 20, 2026
     """)
     
     # Risk-free rate setting
