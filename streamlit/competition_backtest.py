@@ -30,10 +30,13 @@ from utils import to_utc
 def create_competition_callback(uploader, strategy_name):
     """
     Callback for competition mode - logs to COMPETITION_PERFORMANCE table
-    with $10,000 starting capital normalization
     """
     
+    last_logged_date = None
+    
     def callback(data):
+        nonlocal last_logged_date
+        
         timestamp = data['timestamp']
         portfolio_value = data['portfolio_value']
         cash = data['cash']
@@ -41,9 +44,14 @@ def create_competition_callback(uploader, strategy_name):
         
         current_date = pd.to_datetime(timestamp)
         current_date_utc = to_utc(current_date)
-
-        if current_date_utc.hour != 16 or current_date_utc.minute != 0:
+        
+        current_date_only = current_date_utc.date()
+        
+        # Log first callback per day (no strict time filter)
+        if last_logged_date == current_date_only:
             return
+        
+        last_logged_date = current_date_only
         
         print(f"      💾 Competition: {current_date_utc.date()} | ${portfolio_value:,.2f}")
         
@@ -85,7 +93,7 @@ def create_competition_callback(uploader, strategy_name):
 
 def run_competition_backtest():
     """
-    Run backtest for competition window only (Feb 28 - Apr 17, 2026)
+    Run backtest for competition window only (Feb 28 - Apr 18, 2026)
     Logs to separate tables for clean $10k starting point
     """
     
@@ -96,7 +104,7 @@ def run_competition_backtest():
     
     # Competition parameters
     START_DATE = datetime(2026, 2, 28)
-    END_DATE = datetime(2026, 4, 17)
+    END_DATE = datetime(2026, 4, 18)
     INITIAL_CAPITAL = 10000
     
     print(f"\n🏆 Competition Window")
@@ -178,7 +186,7 @@ def run_competition_backtest():
     print("\n🎯 Next Steps:")
     print("   1. Update Streamlit to read from competition tables")
     print("   2. Show Feb 28 as day 0 with $10,000 starting value")
-    print("   3. Display progress toward Apr 17 end date")
+    print("   3. Display progress toward Apr 18 end date")
 
 
 if __name__ == "__main__":

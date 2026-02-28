@@ -1,28 +1,19 @@
-name: Daily updates since February trading window for the competition
+name: Daily Competition Data Update
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'Kerdos/streamlit/**'
-      - 'Kerdos/src/**'
-      - '.github/workflows/deploy-streamlit.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'Kerdos/streamlit/**'
+  schedule:
+    - cron: '0 2 * * 1-5'  # 2 AM UTC, Monday-Friday
   
-  # Allow manual trigger
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Deployment environment'
+        description: 'Run type'
         required: true
         default: 'production'
         type: choice
         options:
         - production
-        - staging
+        - test
 
 env:
   PYTHON_VERSION: '3.9'
@@ -43,76 +34,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r ${{ env.STREAMLIT_APP_PATH }}/requirements.txt
-        pip install pytest pytest-cov flake8
+        pip install -r Kerdos/requirements.txt
     
-    - name: Lint with flake8
+    - name: Verify Python scripts
       run: |
-        flake8 ${{ env.STREAMLIT_APP_PATH }} --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 ${{ env.STREAMLIT_APP_PATH }} --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
-    - name: Test Streamlit app syntax
-      run: |
-        cd ${{ env.STREAMLIT_APP_PATH }}
-        python -m py_compile streamlit_app.py
-    
-    - name: Test data connections (mock)
-      run: |
-        cd ${{ env.STREAMLIT_APP_PATH }}
-        python -c "
-        import sys
-        sys.path.append('.')
-        # Mock test - check imports work
-        try:
-            import streamlit as st
-            import pandas as pd
-            import plotly.graph_objects as go
-            print('✅ All imports successful')
-        except ImportError as e:
-            print(f'❌ Import error: {e}')
-            sys.exit(1)
-        "
-
-  deploy-staging:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    environment: staging
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Streamlit Cloud (Staging)
-      run: |
-        echo "🚀 Deploying to Streamlit Cloud staging environment..."
-        echo "App URL: https://kerdos-fund-staging.streamlit.app"
-        
-        # In a real setup, you'd trigger Streamlit Cloud deployment
-        # curl -X POST "https://share.streamlit.io/api/v1/deploy" \
-        #   -H "Authorization: Bearer ${{ secrets.STREAMLIT_CLOUD_TOKEN }}" \
-        #   -d '{"repo": "${{ github.repository }}", "branch": "main", "app_path": "Kerdos/streamlit/streamlit_app.py"}'
-
-  deploy-production:
-    needs: [test, deploy-staging]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Deploy to Streamlit Cloud (Production)
-      run: |
-        echo "🚀 Deploying to Streamlit Cloud production environment..."
-        echo "App URL: https://kerdos-fund.streamlit.app"
-        
-        # Production deployment with health checks
-        echo "✅ Production deployment completed"
+        cd Kerdos
+        python -m py_compile run_competition_backtest.py
+        echo "✅ Scripts validated"
 
   update-competition-data:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     
     steps:
     - uses: actions/checkout@v4
@@ -127,7 +59,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r Kerdos/requirements.txt
     
-    - name: Run competition backtest update
+    - name: Run competition backtest
       env:
         SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
         SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
@@ -137,21 +69,24 @@ jobs:
         SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
       run: |
         cd Kerdos
+        echo "📊 Running competition backtest..."
+        echo "Date range: Feb 28, 2026 - $(date -d yesterday '+%Y-%m-%d')"
         python run_competition_backtest.py
         echo "✅ Competition data updated"
 
   notify:
-    needs: [deploy-production, update-competition-data]
+    needs: [update-competition-data]
     runs-on: ubuntu-latest
     if: always()
     
     steps:
-    - name: Notify deployment status
+    - name: Report status
       run: |
-        if [ "${{ needs.deploy-production.result }}" == "success" ]; then
-          echo "✅ Deployment successful!"
-          echo "🌐 Production: https://kerdos-fund.streamlit.app"
-          echo "🧪 Staging: https://kerdos-fund-staging.streamlit.app"
+        if [ "${{ needs.update-competition-data.result }}" == "success" ]; then
+          echo "✅ Daily backtest completed!"
+          echo "📊 Competition data current through yesterday"
+          echo "🌐 View at: https://kerdos-fund.streamlit.app"
         else
-          echo "❌ Deployment failed"
+          echo "❌ Backtest failed - check workflow logs"
+          exit 1
         fi
