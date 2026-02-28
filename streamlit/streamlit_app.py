@@ -270,7 +270,7 @@ CHART_COLOR_SEQUENCE = [
 ]
 
 competition_start = datetime(2026, 2, 28)
-competition_end = datetime(2026, 4, 17)
+competition_end = datetime(2026, 4, 18)
 current_date = datetime.now()
 
 # ============================================================================
@@ -1114,12 +1114,13 @@ def main():
     )
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📊 Data View")
-    view_mode = st.sidebar.radio(
-        "Select view:",
-        ["Historical (2024-2026)", "Competition (Feb 28 onwards)"],
-        help="Switch between full historical backtest and competition window"
-    )
-    mode = "competition" if "Competition" in view_mode else "historical"
+    # view_mode = st.sidebar.radio(
+    #    "Select view:",
+    #    ["Historical (2024-2026)", "Competition (Feb 28 onwards)"],
+    #    help="Switch between full historical backtest and competition window"
+    # )
+    # mode = "competition" if "Competition" in view_mode else "historical"
+    mode = "historical"  # For now, default to historical view for all pages
 
     # Sidebar info
     st.sidebar.markdown("---")
@@ -1143,31 +1144,30 @@ def main():
         step=0.01
     ) / 100
 
-    competition_start = datetime(2026, 2, 28)
-    current_date = datetime.now()
+    # competition_start = datetime(2026, 2, 28)
+    # current_date = datetime.now()
     
     # Add competition status to sidebar
-    if "Competition" in view_mode:
-        status = get_competition_status()
-        if status['color'] == 'info':
-            st.sidebar.info(f"🕐 {status['message']}")
-        elif status['color'] == 'success':
-            st.sidebar.success(f"🏁 {status['message']}")
-        else:
-            st.sidebar.warning(f"🏆 {status['message']}")
+    # if "Competition" in view_mode:
+    #    status = get_competition_status()
+    #    if status['color'] == 'info':
+    #        st.sidebar.info(f"🕐 {status['message']}")
+    #    elif status['color'] == 'success':
+    #        st.sidebar.success(f"🏁 {status['message']}")
+    #    else:
+    #        st.sidebar.warning(f"🏆 {status['message']}")
 
-    if mode == "competition" and current_date < competition_start:
-        # Show preview message for competition mode before start date
-        st.info(f"""
-        🏆 **Competition Preview Mode**
-        
-        The competition starts on **February 28, 2026**. 
-        Currently showing historical data for preview.
-        
-        Days until competition start: **{(competition_start - current_date).days}**
-        """)
-        # Fall back to historical mode for data loading
-        mode = "historical"
+    # if mode == "competition" and current_date < competition_start:
+    #    # Show preview message for competition mode before start date
+    #    st.info(f"""
+    #    🏆 **Competition Preview Mode**
+    #
+    #    The competition starts on **February 28, 2026**.
+    #    Currently showing historical data for preview.
+    #
+    #    Days until competition start: **{(competition_start - current_date).days}**
+    #    """)
+    #    # Fall back to historical mode for data loading
     
     # Load data
     with st.spinner("Loading data from Snowflake..."):
@@ -1189,7 +1189,7 @@ def main():
     # Route to pages
     if page == "Fund Overview":
         # Pass the original view mode for display purposes
-        original_mode = "competition" if "Competition" in view_mode else "historical"
+        original_mode = "historical"
         render_fund_overview(perf_df, mode=original_mode)
     #elif page == "Paper Trading Performance":
     #    # expand render_fund_overview to support trading with custom start and end dates
