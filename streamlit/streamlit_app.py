@@ -485,13 +485,13 @@ def render_fund_overview(perf_df, mode="historical"):
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Total Return", "118.3%", "+74.8% vs SPY")
-            st.metric("Sharpe Ratio", "1.91", "+0.99 vs SPY")
+            st.metric("Total Return", "115.3%", "+71.2% vs SPY")
+            st.metric("Sharpe Ratio", "1.87", "+0.94 vs SPY")
         with col2:
-            st.metric("CAGR", "44.0%", "+25.7pp vs SPY")
+            st.metric("CAGR", "43.0%", "+24.4pp vs SPY")
             st.metric("Max Drawdown", "-11.7%", "Better by 7.4pp")
         with col3:
-            st.metric("Calmar Ratio", "3.75", "+2.75pp vs SPY")
+            st.metric("Calmar Ratio", "3.67", "+2.69pp vs SPY")
             st.metric("Corr. to SPY", "0.06", "Near-zero dependency")
 
         st.markdown("---")
