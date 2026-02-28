@@ -1112,8 +1112,8 @@ def main():
     ["Fund Overview", "Performance & Benchmark"], #, "Paper Trading Performance"],
     help="Navigate through different sections"
     )
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 📊 Data View")
+    # st.sidebar.markdown("---")
+    # st.sidebar.markdown("### 📊 Data View")
     # view_mode = st.sidebar.radio(
     #    "Select view:",
     #    ["Historical (2024-2026)", "Competition (Feb 28 onwards)"],
